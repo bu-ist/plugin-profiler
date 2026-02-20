@@ -52,7 +52,7 @@ ${BOLD}Options:${NC}
   --port <n>           Port for web UI (default: 9000)
   --llm <provider>     Enable AI descriptions: claude, ollama, openai, gemini
   --model <name>       LLM model name (default: qwen2.5-coder:7b for ollama)
-  --api-key <key>      API key for gemini / openai / deepseek
+  --api-key <key>      API key for claude / openai / gemini
   --no-descriptions    Skip AI descriptions (faster, offline)
   --json-only          Write JSON only, skip web UI
   --output <dir>       Output directory inside container (default: /output)
