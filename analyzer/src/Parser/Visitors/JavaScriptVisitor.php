@@ -104,6 +104,8 @@ class JavaScriptVisitor
             line: $node->getLocation()?->getStart()?->getLine() ?? 0,
             metadata: ['block_name' => $blockName],
         ));
+
+        $this->addFileEdge($filePath, $nodeId, 'registers_block', 'registers');
     }
 
     private function handleJsHook(CallExpression $node, string $filePath, string $hookType): void
@@ -131,6 +133,8 @@ class JavaScriptVisitor
             subtype: $hookType,
             metadata: ['hook_name' => $hookName],
         ));
+
+        $this->addFileEdge($filePath, $nodeId, 'js_registers_hook', 'registers');
     }
 
     private function handleApiFetch(CallExpression $node, string $filePath): void
@@ -188,6 +192,28 @@ class JavaScriptVisitor
                 'route'       => $path,
             ],
         ));
+
+        $this->addFileEdge($filePath, $nodeId, 'js_api_call', 'calls');
+    }
+
+    /**
+     * Ensure a file node exists and add an edge from it to a target node.
+     */
+    private function addFileEdge(string $filePath, string $targetId, string $type, string $label): void
+    {
+        $fileNodeId = GraphNode::sanitizeId('file_' . $filePath);
+
+        if (!$this->collection->hasNode($fileNodeId)) {
+            $this->collection->addNode(GraphNode::make(
+                id: $fileNodeId,
+                label: basename($filePath),
+                type: 'file',
+                file: $filePath,
+                line: 0,
+            ));
+        }
+
+        $this->collection->addEdge(Edge::make($fileNodeId, $targetId, $type, $label));
     }
 
     private function handleImport(ImportDeclaration $node, string $filePath): void
