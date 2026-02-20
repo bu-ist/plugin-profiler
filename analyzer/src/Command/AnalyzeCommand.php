@@ -15,6 +15,7 @@ use PluginProfiler\Graph\EntityCollection;
 use PluginProfiler\Graph\GraphBuilder;
 use PluginProfiler\Graph\PluginMetadata;
 use PluginProfiler\LLM\ApiClient;
+use PluginProfiler\LLM\ClaudeClient;
 use PluginProfiler\LLM\DescriptionGenerator;
 use PluginProfiler\LLM\OllamaClient;
 use PluginProfiler\Parser\PluginParser;
@@ -39,7 +40,7 @@ class AnalyzeCommand extends Command
             ->setDescription('Analyze a WordPress plugin directory and generate a graph visualization')
             ->addArgument('path', InputArgument::REQUIRED, 'Path to the WordPress plugin directory')
             ->addOption('port', null, InputOption::VALUE_REQUIRED, 'Port for web UI', '9000')
-            ->addOption('llm', null, InputOption::VALUE_REQUIRED, 'LLM provider: ollama, gemini, openai, deepseek', 'ollama')
+            ->addOption('llm', null, InputOption::VALUE_REQUIRED, 'LLM provider: claude, ollama, openai, gemini, deepseek', 'ollama')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'LLM model name', 'qwen2.5-coder:7b')
             ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'API key for external LLM provider')
             ->addOption('no-descriptions', null, InputOption::VALUE_NONE, 'Skip LLM description generation')
@@ -147,6 +148,8 @@ class AnalyzeCommand extends Command
             if ($llmProvider === 'ollama') {
                 $ollamaHost = (string) (getenv('OLLAMA_HOST') ?: 'http://ollama:11434');
                 $client     = new OllamaClient($ollamaHost, $llmModel, $timeout);
+            } elseif ($llmProvider === 'claude') {
+                $client = new ClaudeClient($apiKey, $llmModel, min($timeout, 60));
             } else {
                 $client = ApiClient::forProvider($llmProvider, $apiKey, $llmModel, min($timeout, 60));
             }

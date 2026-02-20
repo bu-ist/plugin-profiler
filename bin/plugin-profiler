@@ -50,7 +50,7 @@ ${BOLD}Arguments:${NC}
 
 ${BOLD}Options:${NC}
   --port <n>           Port for web UI (default: 9000)
-  --llm <provider>     Enable AI descriptions: ollama, gemini, openai, deepseek
+  --llm <provider>     Enable AI descriptions: claude, ollama, openai, gemini, deepseek
   --model <name>       LLM model name (default: qwen2.5-coder:7b for ollama)
   --api-key <key>      API key for gemini / openai / deepseek
   --no-descriptions    Skip AI descriptions (faster, offline)
@@ -65,8 +65,9 @@ ${BOLD}With AI descriptions (local, free — downloads ~4 GB model first time):$
   plugin-profiler analyze ./my-plugin --llm ollama
 
 ${BOLD}With AI descriptions (cloud, instant):${NC}
-  plugin-profiler analyze ./my-plugin --llm gemini --api-key YOUR_KEY
+  plugin-profiler analyze ./my-plugin --llm claude  --api-key sk-ant-...
   plugin-profiler analyze ./my-plugin --llm openai  --api-key sk-...
+  plugin-profiler analyze ./my-plugin --llm gemini  --api-key YOUR_KEY
 
 EOF
 }
@@ -138,6 +139,7 @@ fi
 if [[ -z "$LLM_MODEL" ]]; then
     case "${LLM_PROVIDER:-}" in
         ollama)   LLM_MODEL="qwen2.5-coder:7b" ;;
+        claude)   LLM_MODEL="claude-haiku-4-5-20251001" ;;
         gemini)   LLM_MODEL="gemini-2.0-flash" ;;
         openai)   LLM_MODEL="gpt-4o-mini" ;;
         deepseek) LLM_MODEL="deepseek-chat" ;;
