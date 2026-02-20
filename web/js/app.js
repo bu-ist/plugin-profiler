@@ -1,5 +1,5 @@
 import { initCytoscape } from './graph.js';
-import { applyLayout } from './layouts.js';
+import { applyLayout, LAYOUTS } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar } from './sidebar.js';
 import { initSearch } from './search.js';
 
@@ -53,15 +53,32 @@ async function main() {
   initSidebar(cy);
   initSearch(cy);
 
-  // Layout switcher
+  // Auto-select layout: dagre works well for small connected graphs;
+  // CoSE handles large or sparse graphs without collapsing into a band.
+  const nodeCount = (graphData.nodes || []).length;
+  const edgeCount = (graphData.edges || []).length;
+  const density   = nodeCount > 0 ? edgeCount / nodeCount : 0;
+  const autoLayout = (nodeCount > 200 || density < 0.6) ? 'cose' : 'dagre';
+
   const layoutSelect = document.getElementById('layout-select');
   if (layoutSelect) {
+    layoutSelect.value = autoLayout;
     layoutSelect.addEventListener('change', () => applyLayout(cy, layoutSelect.value));
   }
 
-  // Zoom controls
-  document.getElementById('zoom-in')?.addEventListener('click',  () => cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: cy.extent() }));
-  document.getElementById('zoom-out')?.addEventListener('click', () => cy.zoom({ level: cy.zoom() * 0.77, renderedPosition: cy.extent() }));
+  // Apply the chosen layout (replaces the dagre default set in initCytoscape)
+  applyLayout(cy, autoLayout);
+
+  // Zoom controls — zoom toward the center of the viewport
+  const zoomCenter = () => {
+    const ext = cy.extent();
+    return {
+      x: (ext.x1 + ext.x2) / 2,
+      y: (ext.y1 + ext.y2) / 2,
+    };
+  };
+  document.getElementById('zoom-in')?.addEventListener('click',  () => cy.zoom({ level: cy.zoom() * 1.3, position: zoomCenter() }));
+  document.getElementById('zoom-out')?.addEventListener('click', () => cy.zoom({ level: cy.zoom() * 0.77, position: zoomCenter() }));
   document.getElementById('zoom-fit')?.addEventListener('click', () => cy.fit());
 
   // Sidebar close button (delegated, since sidebar content is re-rendered)

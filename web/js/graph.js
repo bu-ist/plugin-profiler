@@ -167,7 +167,7 @@ export function initCytoscape(container, elements, onNodeClick, onNodeHover, onN
     container,
     elements,
     style: buildStylesheet(),
-    layout: LAYOUTS.dagre,
+    layout: { name: 'preset' },  // app.js applies the auto-selected layout after init
     minZoom: 0.05,
     maxZoom: 4,
     wheelSensitivity: 0.3,
