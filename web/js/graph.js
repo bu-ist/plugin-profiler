@@ -159,7 +159,7 @@ export function initCytoscape(container, elements, onNodeClick, onNodeHover, onN
     container,
     elements,
     style: buildStylesheet(),
-    layout: LAYOUTS.dagre,
+    layout: LAYOUTS.cose,
     minZoom: 0.05,
     maxZoom: 4,
     wheelSensitivity: 0.3,

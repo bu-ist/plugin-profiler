@@ -15,12 +15,18 @@ export const LAYOUTS = {
   cose: {
     name: 'cose',
     animate: true,
-    animationDuration: 500,
-    padding: 50,
-    nodeRepulsion: 12000,
-    idealEdgeLength: 140,
-    gravity: 0.2,
+    animationDuration: 800,
+    padding: 60,
+    // High repulsion spreads isolated nodes across the canvas instead of
+    // collapsing them into a band (critical when ~40% of nodes have no edges).
+    nodeRepulsion: 400000,
+    idealEdgeLength: 100,
+    edgeElasticity: 100,
+    gravity: 25,
     numIter: 1000,
+    initialTemp: 200,
+    coolingFactor: 0.95,
+    minTemp: 1.0,
   },
   breadthfirst: {
     name: 'breadthfirst',
