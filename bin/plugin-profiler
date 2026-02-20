@@ -122,7 +122,7 @@ if [[ -n "$API_KEY" ]]; then
     ANALYZER_ENV+=(-e "LLM_API_KEY=$API_KEY")
 fi
 
-ANALYZER_CMD=("php" "/app/bin/analyze" "/plugin")
+ANALYZER_CMD=("/plugin")
 
 if $NO_DESCRIPTIONS; then
     ANALYZER_CMD+=("--no-descriptions")
