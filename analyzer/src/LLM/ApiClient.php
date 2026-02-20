@@ -25,7 +25,7 @@ PROMPT;
     private const PROVIDER_BASE_URLS = [
         'gemini'   => 'https://generativelanguage.googleapis.com/v1beta/openai/',
         'openai'   => 'https://api.openai.com/v1/',
-        'deepseek' => 'https://api.deepseek.com/v1/',
+        'claude'   => 'https://api.anthropic.com/v1/',  // routed to ClaudeClient; kept for completeness
     ];
 
     public function __construct(

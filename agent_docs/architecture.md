@@ -79,7 +79,7 @@ Shell script that:
 ### CLI Options
     plugin-profiler analyze <path> [options]
       --port <n>              Port for web UI (default: 9000)
-      --llm <provider>        ollama | gemini | openai | deepseek (default: ollama)
+      --llm <provider>        claude | ollama | openai | gemini (default: ollama)
       --model <name>          LLM model name (default: qwen2.5-coder:7b)
       --api-key <key>         API key for external LLM provider
       --no-descriptions       Skip LLM description generation

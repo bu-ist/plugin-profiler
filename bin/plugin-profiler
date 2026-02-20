@@ -50,7 +50,7 @@ ${BOLD}Arguments:${NC}
 
 ${BOLD}Options:${NC}
   --port <n>           Port for web UI (default: 9000)
-  --llm <provider>     Enable AI descriptions: claude, ollama, openai, gemini, deepseek
+  --llm <provider>     Enable AI descriptions: claude, ollama, openai, gemini
   --model <name>       LLM model name (default: qwen2.5-coder:7b for ollama)
   --api-key <key>      API key for gemini / openai / deepseek
   --no-descriptions    Skip AI descriptions (faster, offline)
@@ -142,7 +142,6 @@ if [[ -z "$LLM_MODEL" ]]; then
         claude)   LLM_MODEL="claude-haiku-4-5-20251001" ;;
         gemini)   LLM_MODEL="gemini-2.0-flash" ;;
         openai)   LLM_MODEL="gpt-4o-mini" ;;
-        deepseek) LLM_MODEL="deepseek-chat" ;;
         *)        LLM_MODEL="qwen2.5-coder:7b" ;;
     esac
 fi

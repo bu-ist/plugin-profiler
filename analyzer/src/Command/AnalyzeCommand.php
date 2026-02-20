@@ -40,7 +40,7 @@ class AnalyzeCommand extends Command
             ->setDescription('Analyze a WordPress plugin directory and generate a graph visualization')
             ->addArgument('path', InputArgument::REQUIRED, 'Path to the WordPress plugin directory')
             ->addOption('port', null, InputOption::VALUE_REQUIRED, 'Port for web UI', '9000')
-            ->addOption('llm', null, InputOption::VALUE_REQUIRED, 'LLM provider: claude, ollama, openai, gemini, deepseek', 'ollama')
+            ->addOption('llm', null, InputOption::VALUE_REQUIRED, 'LLM provider: claude, ollama, openai, gemini', 'ollama')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'LLM model name', 'qwen2.5-coder:7b')
             ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'API key for external LLM provider')
             ->addOption('no-descriptions', null, InputOption::VALUE_NONE, 'Skip LLM description generation')

@@ -106,7 +106,7 @@ Arguments:
 
 Options:
   --port <n>           Port for the web UI  (default: 9000)
-  --llm <provider>     LLM provider: ollama, gemini, openai, deepseek  (default: ollama)
+  --llm <provider>     LLM provider: claude, ollama, openai, gemini  (default: ollama)
   --model <name>       LLM model identifier  (default: qwen2.5-coder:7b)
   --api-key <key>      API key for external LLM providers
   --no-descriptions    Skip LLM description generation (much faster)
@@ -133,11 +133,11 @@ plugin-profiler analyze ./my-plugin \
   --model gpt-4o-mini \
   --api-key sk-...
 
-# Use DeepSeek
+# Use Claude (Anthropic)
 plugin-profiler analyze ./my-plugin \
-  --llm deepseek \
-  --model deepseek-chat \
-  --api-key YOUR_DEEPSEEK_KEY
+  --llm claude \
+  --model claude-haiku-4-5-20251001 \
+  --api-key sk-ant-...
 
 # Use local Ollama (starts Ollama container automatically)
 plugin-profiler analyze ./my-plugin \
@@ -160,9 +160,9 @@ Plugin Profiler can generate a 2–3 sentence description for every node in the 
 | Provider | `--llm` value | Cost (Gravity Forms ~250 entities) |
 |---|---|---|
 | **Ollama (local)** | `ollama` | Free |
-| Google Gemini 2.5 Flash | `gemini` | ~$0.03 |
-| DeepSeek V3 | `deepseek` | ~$0.02 |
+| **Claude Haiku** | `claude` | ~$0.01 |
 | OpenAI GPT-4o mini | `openai` | ~$0.11 |
+| Google Gemini 2.0 Flash | `gemini` | ~$0.03 |
 
 ### Ollama (local, default)
 
@@ -298,7 +298,7 @@ PORT=9000
 # Absolute path to the plugin directory on your host
 PLUGIN_PATH=./my-plugin
 
-# LLM provider: ollama | gemini | openai | deepseek
+# LLM provider: claude | ollama | openai | gemini
 LLM_PROVIDER=ollama
 LLM_MODEL=qwen2.5-coder:7b
 

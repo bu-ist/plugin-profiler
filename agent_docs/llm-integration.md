@@ -8,10 +8,10 @@ The LLM generates natural-language descriptions for each entity in the graph. De
 
     DescriptionGenerator
     +-- OllamaClient      (default: local Ollama container)
-    +-- ApiClient          (optional: Gemini Flash, GPT-4o mini, DeepSeek)
-        +-- GeminiProvider
+    +-- ClaudeClient      (Anthropic Messages API)
+    +-- ApiClient         (OpenAI-compatible: OpenAI, Gemini)
         +-- OpenAIProvider
-        +-- DeepSeekProvider
+        +-- GeminiProvider
 
 Both clients implement LLMClientInterface:
 
@@ -33,7 +33,7 @@ Both clients implement LLMClientInterface:
 
 ## API Client
 
-- Supports OpenAI-compatible API format (works with Gemini, OpenAI, DeepSeek)
+- Supports OpenAI-compatible API format (works with Gemini, OpenAI)
 - Endpoint: configurable via LLM_API_BASE_URL
 - Auth: Bearer token via LLM_API_KEY
 - Timeout: 30s per batch
@@ -89,8 +89,8 @@ Both clients implement LLMClientInterface:
 ## Cost Estimates (per Gravity Forms-scale analysis)
 
 - Ollama (local) qwen2.5-coder:7b: $0.00
-- Google Gemini 2.5 Flash: ~$0.03
-- DeepSeek V3.2-Exp: ~$0.02
+- Claude Haiku: ~$0.01
+- Google Gemini 2.0 Flash: ~$0.03
 - OpenAI GPT-4o mini: ~$0.11
 
 ## Error Handling
@@ -102,7 +102,7 @@ Both clients implement LLMClientInterface:
 
 ## Configuration (Environment Variables)
 
-- LLM_PROVIDER (default: ollama) — ollama, gemini, openai, deepseek
+- LLM_PROVIDER (default: ollama) — claude, ollama, openai, gemini
 - LLM_MODEL (default: qwen2.5-coder:7b) — Model identifier
 - LLM_API_KEY (default: none) — API key for external providers
 - LLM_API_BASE_URL (default: none) — Custom API endpoint
