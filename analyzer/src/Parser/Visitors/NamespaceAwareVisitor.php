@@ -10,13 +10,14 @@ use PhpParser\NodeVisitorAbstract;
 use PluginProfiler\Graph\EntityCollection;
 
 /**
- * Base visitor that tracks the current namespace and class context.
+ * Base visitor that tracks the current namespace, class, and method/function context.
  * All visitors that need namespace/class awareness should extend this.
  */
 abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
 {
     protected string $currentNamespace = '';
-    protected string $currentClass = '';
+    protected string $currentClass     = '';
+    protected string $currentMethod    = '';
 
     public function __construct(
         protected readonly EntityCollection $collection,
@@ -26,6 +27,7 @@ abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
     {
         $this->currentNamespace = '';
         $this->currentClass     = '';
+        $this->currentMethod    = '';
 
         return null;
     }
@@ -40,6 +42,14 @@ abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
             $this->currentClass = $node->name?->toString() ?? '';
         }
 
+        if ($node instanceof Stmt\ClassMethod) {
+            $this->currentMethod = $node->name->toString();
+        }
+
+        if ($node instanceof Stmt\Function_) {
+            $this->currentMethod = $node->name->toString();
+        }
+
         return null;
     }
 
@@ -50,10 +60,31 @@ abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
         }
 
         if ($node instanceof Stmt\Class_) {
-            $this->currentClass = '';
+            $this->currentClass  = '';
+            $this->currentMethod = '';
+        }
+
+        if ($node instanceof Stmt\ClassMethod || $node instanceof Stmt\Function_) {
+            $this->currentMethod = '';
         }
 
         return null;
+    }
+
+    /**
+     * Returns the node ID of the current enclosing method or function, or null if at file scope.
+     */
+    protected function currentCallerId(): ?string
+    {
+        if ($this->currentMethod === '') {
+            return null;
+        }
+
+        if ($this->currentClass !== '') {
+            return 'method_' . $this->currentClass . '_' . $this->currentMethod;
+        }
+
+        return 'func_' . $this->currentMethod;
     }
 
     /**

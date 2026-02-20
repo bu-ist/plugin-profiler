@@ -64,21 +64,40 @@ class HookVisitor extends NamespaceAwareVisitor
         );
         $this->collection->addNode($hookNode);
 
-        // Determine edge type
         $isRegister = in_array($funcName, self::REGISTER_FUNCS, true);
-        $edgeType   = $isRegister ? 'registers_hook' : 'triggers_hook';
-        $edgeLabel  = $isRegister ? 'registers' : 'triggers';
 
-        // Arg 1 (optional): callback
-        if (!$isRegister || !isset($node->args[1])) {
-            return;
-        }
+        if ($isRegister) {
+            // add_action / add_filter: edge from callback → hook
+            if (!isset($node->args[1])) {
+                return;
+            }
 
-        $callbackArg = $node->args[1]->value;
-        $callbackIds = $this->resolveCallback($callbackArg, $node);
+            $callbackArg = $node->args[1]->value;
+            $callbackIds = $this->resolveCallback($callbackArg, $node);
 
-        foreach ($callbackIds as $callbackId) {
-            $this->collection->addEdge(Edge::make($callbackId, $hookId, $edgeType, $edgeLabel));
+            foreach ($callbackIds as $callbackId) {
+                $this->collection->addEdge(Edge::make($callbackId, $hookId, 'registers_hook', 'registers'));
+            }
+
+            // If this is a wp_ajax_* hook, also link the hook node to the ajax_handler node
+            if (str_starts_with($hookName, 'wp_ajax_')) {
+                $isNoPriv   = str_starts_with($hookName, 'wp_ajax_nopriv_');
+                $actionName = $isNoPriv
+                    ? substr($hookName, strlen('wp_ajax_nopriv_'))
+                    : substr($hookName, strlen('wp_ajax_'));
+                $ajaxId = 'ajax_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $actionName);
+
+                // Edge: hook → ajax_handler (hook triggers the ajax handler)
+                if ($this->collection->hasNode($ajaxId)) {
+                    $this->collection->addEdge(Edge::make($hookId, $ajaxId, 'triggers_handler', 'triggers'));
+                }
+            }
+        } else {
+            // do_action / apply_filters: edge from caller → hook
+            $callerId = $this->currentCallerId();
+            if ($callerId !== null) {
+                $this->collection->addEdge(Edge::make($callerId, $hookId, 'triggers_hook', 'triggers'));
+            }
         }
     }
 
@@ -140,6 +159,11 @@ class HookVisitor extends NamespaceAwareVisitor
     {
         // $this → use current class
         if ($classExpr instanceof Expr\Variable && $classExpr->name === 'this') {
+            return $this->currentClass !== '' ? $this->currentClass : null;
+        }
+
+        // __CLASS__ magic constant
+        if ($classExpr instanceof Node\Scalar\MagicConst\Class_) {
             return $this->currentClass !== '' ? $this->currentClass : null;
         }
 

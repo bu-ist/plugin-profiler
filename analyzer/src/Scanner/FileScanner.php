@@ -10,13 +10,19 @@ use SplFileInfo;
 
 class FileScanner
 {
+    /** Always-skipped directory names regardless of ignore files. */
     private const SKIP_DIRECTORIES = ['vendor', 'node_modules', '.git'];
 
     private const PHP_EXTENSIONS = ['php'];
     private const JS_EXTENSIONS  = ['js', 'jsx', 'ts', 'tsx'];
 
+    /** @var array<string> Compiled ignore patterns (relative glob-style strings). */
+    private array $ignorePatterns = [];
+
     /**
      * Recursively scan a directory and return paths to all relevant files.
+     *
+     * Respects .gitignore and .profilerignore files in the plugin root.
      *
      * @return array<string>
      */
@@ -26,6 +32,8 @@ class FileScanner
             return [];
         }
 
+        $this->loadIgnorePatterns($directory);
+
         $files  = [];
         $flags  = RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::FOLLOW_SYMLINKS;
         $dirItr = new RecursiveDirectoryIterator($directory, $flags);
@@ -33,18 +41,14 @@ class FileScanner
 
         /** @var SplFileInfo $fileInfo */
         foreach ($itr as $fileInfo) {
+            $realPath = $fileInfo->getRealPath();
+            $relative = $this->toRelative($realPath, $directory);
+
             if ($fileInfo->isDir()) {
-                if (in_array($fileInfo->getBasename(), self::SKIP_DIRECTORIES, true)) {
-                    $itr->next();
-                    // Skip into the blocked directory by adjusting depth
-                    // RecursiveIteratorIterator doesn't support skipping subtrees natively,
-                    // so we track skipped dirs and filter on path instead.
-                }
                 continue;
             }
 
-            // Filter out files inside skipped directories
-            if ($this->isInsideSkippedDirectory($fileInfo->getRealPath(), $directory)) {
+            if ($this->isIgnored($relative, $directory)) {
                 continue;
             }
 
@@ -52,21 +56,148 @@ class FileScanner
             $extension = strtolower($fileInfo->getExtension());
 
             if ($basename === 'block.json') {
-                $files[] = $fileInfo->getRealPath();
+                $files[] = $realPath;
                 continue;
             }
 
             if (in_array($extension, self::PHP_EXTENSIONS, true)) {
-                $files[] = $fileInfo->getRealPath();
+                $files[] = $realPath;
                 continue;
             }
 
             if (in_array($extension, self::JS_EXTENSIONS, true)) {
-                $files[] = $fileInfo->getRealPath();
+                $files[] = $realPath;
             }
         }
 
         return $files;
+    }
+
+    /**
+     * Load ignore patterns from .gitignore and .profilerignore in the plugin root.
+     * .profilerignore takes the same format as .gitignore.
+     */
+    private function loadIgnorePatterns(string $directory): void
+    {
+        $this->ignorePatterns = [];
+
+        foreach (['.gitignore', '.profilerignore'] as $ignoreFile) {
+            $path = $directory . DIRECTORY_SEPARATOR . $ignoreFile;
+            if (!is_readable($path)) {
+                continue;
+            }
+
+            $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if ($lines === false) {
+                continue;
+            }
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                // Skip comments
+                if ($line === '' || str_starts_with($line, '#')) {
+                    continue;
+                }
+                // Negation patterns (!) are not supported — skip them
+                if (str_starts_with($line, '!')) {
+                    continue;
+                }
+                $this->ignorePatterns[] = $line;
+            }
+        }
+    }
+
+    /**
+     * Determine whether a relative path should be ignored.
+     * Checks always-skip directories first, then parsed ignore patterns.
+     */
+    private function isIgnored(string $relative, string $baseDir): bool
+    {
+        $segments = explode('/', str_replace(DIRECTORY_SEPARATOR, '/', $relative));
+
+        // Always skip hard-coded directories and hidden directories (dot-prefixed)
+        foreach ($segments as $segment) {
+            if ($segment === '') {
+                continue;
+            }
+            if (in_array($segment, self::SKIP_DIRECTORIES, true)) {
+                return true;
+            }
+            // Skip hidden directories (.bu-baseline, .github, .circleci, etc.)
+            // but NOT hidden files at the root (they may be config files we scan)
+            if (str_starts_with($segment, '.') && $segment !== end($segments)) {
+                return true;
+            }
+        }
+
+        // Check loaded ignore patterns
+        foreach ($this->ignorePatterns as $pattern) {
+            if ($this->matchesPattern($relative, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Match a relative file path against a single gitignore-style pattern.
+     * Supports trailing slashes (directory-only), leading slashes (root-anchored),
+     * and basic * wildcards. Does not support ** or complex negation.
+     */
+    private function matchesPattern(string $relative, string $pattern): bool
+    {
+        // Normalise to forward slashes
+        $relative = str_replace(DIRECTORY_SEPARATOR, '/', $relative);
+
+        // Directory-only pattern (trailing slash): match any path segment
+        $dirOnly = str_ends_with($pattern, '/');
+        $pattern = rtrim($pattern, '/');
+
+        // Root-anchored pattern (leading slash): match from root only
+        $anchored = str_starts_with($pattern, '/');
+        $pattern  = ltrim($pattern, '/');
+
+        // Convert glob wildcards to regex
+        $regex = '#' . str_replace(
+            ['\\*', '\\?', '\\['],
+            ['[^/]*', '[^/]', '['],
+            preg_quote($pattern, '#')
+        ) . '#';
+
+        if ($dirOnly) {
+            // Pattern must match a directory component of the path
+            $parts = explode('/', $relative);
+            foreach ($parts as $i => $part) {
+                $sub = implode('/', array_slice($parts, 0, $i + 1));
+                if (preg_match($regex, $anchored ? $sub : $part)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($anchored) {
+            return (bool) preg_match($regex, $relative);
+        }
+
+        // Non-anchored: match against file name or any path component
+        $basename = basename($relative);
+        if (preg_match($regex, $basename)) {
+            return true;
+        }
+
+        // Also try matching against each trailing sub-path
+        $parts = explode('/', $relative);
+        for ($i = 0; $i < count($parts); $i++) {
+            $sub = implode('/', array_slice($parts, $i));
+            if (preg_match($regex, $sub)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -140,15 +271,13 @@ class FileScanner
         );
     }
 
-    private function isInsideSkippedDirectory(string $realPath, string $baseDir): bool
+    private function toRelative(string $absolutePath, string $baseDir): string
     {
-        foreach (self::SKIP_DIRECTORIES as $skip) {
-            $pattern = DIRECTORY_SEPARATOR . $skip . DIRECTORY_SEPARATOR;
-            if (str_contains($realPath, $pattern)) {
-                return true;
-            }
+        $baseDir = rtrim($baseDir, '/\\') . DIRECTORY_SEPARATOR;
+        if (str_starts_with($absolutePath, $baseDir)) {
+            return str_replace(DIRECTORY_SEPARATOR, '/', substr($absolutePath, strlen($baseDir)));
         }
 
-        return false;
+        return $absolutePath;
     }
 }

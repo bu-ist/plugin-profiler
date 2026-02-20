@@ -7,6 +7,7 @@ namespace PluginProfiler\Parser\Visitors;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
+use PluginProfiler\Graph\Edge;
 use PluginProfiler\Graph\Node as GraphNode;
 
 class ExternalInterfaceVisitor extends NamespaceAwareVisitor
@@ -43,6 +44,18 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
         return null;
     }
 
+    /**
+     * Add an edge from the current enclosing method/function to the given node ID.
+     * Edge type is 'registers' — the caller is what registers/creates this entity.
+     */
+    private function addCallerEdge(string $targetId, string $label = 'registers'): void
+    {
+        $callerId = $this->currentCallerId();
+        if ($callerId !== null) {
+            $this->collection->addEdge(Edge::make($callerId, $targetId, 'registers', $label));
+        }
+    }
+
     private function handleRestRoute(Expr\FuncCall $node): void
     {
         if (!isset($node->args[0], $node->args[1])) {
@@ -73,6 +86,8 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
                     'route'       => $namespace . $route,
                 ],
             ));
+
+            $this->addCallerEdge($nodeId, 'registers_rest');
         }
     }
 
@@ -87,13 +102,16 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
+        $nodeId = 'shortcode_' . $tag;
         $this->collection->addNode(GraphNode::make(
-            id: 'shortcode_' . $tag,
+            id: $nodeId,
             label: '[' . $tag . ']',
             type: 'shortcode',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),
         ));
+
+        $this->addCallerEdge($nodeId, 'registers_shortcode');
     }
 
     private function handleAdminPage(Expr\FuncCall $node, string $funcName): void
@@ -116,13 +134,16 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             ? ($this->resolveStringArg($node->args[$titleIndex]->value) ?? $slug)
             : $slug;
 
+        $nodeId = 'admin_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $slug);
         $this->collection->addNode(GraphNode::make(
-            id: 'admin_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $slug),
+            id: $nodeId,
             label: $title,
             type: 'admin_page',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),
         ));
+
+        $this->addCallerEdge($nodeId, 'registers_page');
     }
 
     private function handleCronJob(Expr\FuncCall $node): void
@@ -140,13 +161,16 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
+        $nodeId = 'cron_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $hookName);
         $this->collection->addNode(GraphNode::make(
-            id: 'cron_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $hookName),
+            id: $nodeId,
             label: $hookName,
             type: 'cron_job',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),
         ));
+
+        $this->addCallerEdge($nodeId, 'schedules_cron');
     }
 
     private function handlePostType(Expr\FuncCall $node): void
@@ -160,13 +184,16 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
+        $nodeId = 'post_type_' . $slug;
         $this->collection->addNode(GraphNode::make(
-            id: 'post_type_' . $slug,
+            id: $nodeId,
             label: $slug,
             type: 'post_type',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),
         ));
+
+        $this->addCallerEdge($nodeId, 'registers_post_type');
     }
 
     private function handleTaxonomy(Expr\FuncCall $node): void
@@ -180,13 +207,16 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
+        $nodeId = 'taxonomy_' . $slug;
         $this->collection->addNode(GraphNode::make(
-            id: 'taxonomy_' . $slug,
+            id: $nodeId,
             label: $slug,
             type: 'taxonomy',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),
         ));
+
+        $this->addCallerEdge($nodeId, 'registers_taxonomy');
     }
 
     private function handleHttpCall(Expr\FuncCall $node, string $funcName): void
@@ -216,6 +246,8 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
                 'route'       => $url,
             ],
         ));
+
+        $this->addCallerEdge($nodeId, 'http_request');
     }
 
     /**
@@ -241,8 +273,9 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             ? substr($hookName, strlen('wp_ajax_nopriv_'))
             : substr($hookName, strlen('wp_ajax_'));
 
+        $nodeId = 'ajax_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $actionName);
         $this->collection->addNode(GraphNode::make(
-            id: 'ajax_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $actionName),
+            id: $nodeId,
             label: $actionName,
             type: 'ajax_handler',
             file: $this->collection->getCurrentFile(),
@@ -251,6 +284,8 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
                 'hook_name' => $hookName,
             ],
         ));
+
+        $this->addCallerEdge($nodeId, 'registers_ajax');
     }
 
     /** @param array<Node\Arg|Node\VariadicPlaceholder>|null $argsArray */

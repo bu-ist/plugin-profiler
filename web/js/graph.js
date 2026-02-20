@@ -128,6 +128,14 @@ function buildStylesheet() {
       style: { 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
     },
     {
+      selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
+      style: { 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
+    },
+    {
+      selector: 'edge[type="triggers_handler"]',
+      style: { 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+    },
+    {
       selector: 'node.dimmed',
       style: { 'opacity': 0.15 },
     },
@@ -159,7 +167,7 @@ export function initCytoscape(container, elements, onNodeClick, onNodeHover, onN
     container,
     elements,
     style: buildStylesheet(),
-    layout: LAYOUTS.cose,
+    layout: LAYOUTS.dagre,
     minZoom: 0.05,
     maxZoom: 4,
     wheelSensitivity: 0.3,

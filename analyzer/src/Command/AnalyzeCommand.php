@@ -80,13 +80,15 @@ class AnalyzeCommand extends Command
         // Step 3: Parse
         $output->writeln('<comment>Parsing plugin...</comment>');
         $collection  = new EntityCollection();
+        $fileVisitor = new FileVisitor($collection);
+        $fileVisitor->setPluginRoot($pluginPath);
         $phpVisitors = [
             new ClassVisitor($collection),
             new FunctionVisitor($collection),
             new HookVisitor($collection),
             new DataSourceVisitor($collection),
             new ExternalInterfaceVisitor($collection),
-            new FileVisitor($collection),
+            $fileVisitor,
         ];
 
         $parser = new PluginParser(
