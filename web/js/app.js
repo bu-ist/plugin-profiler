@@ -1,7 +1,39 @@
 import { initCytoscape } from './graph.js';
-import { applyLayout, LAYOUTS } from './layouts.js';
+import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar } from './sidebar.js';
 import { initSearch } from './search.js';
+
+// Max nodes to render in Cytoscape. Beyond this the browser hangs.
+const RENDER_CAP = 1500;
+
+/**
+ * Pick the most-connected nodes to render when the graph exceeds RENDER_CAP.
+ * Prioritises nodes with the most edges so the rendered subgraph is meaningful.
+ * Returns { nodes, edges, truncated } where truncated = true if capped.
+ */
+function capElements(allNodes, allEdges) {
+  if (allNodes.length <= RENDER_CAP) {
+    return { nodes: allNodes, edges: allEdges, truncated: false };
+  }
+
+  // Count degree (in + out) for each node
+  const degree = {};
+  for (const e of allEdges) {
+    const s = e.data.source, t = e.data.target;
+    degree[s] = (degree[s] || 0) + 1;
+    degree[t] = (degree[t] || 0) + 1;
+  }
+
+  // Sort nodes by degree descending, take top RENDER_CAP
+  const sorted = [...allNodes].sort((a, b) =>
+    (degree[b.data.id] || 0) - (degree[a.data.id] || 0)
+  );
+  const kept    = new Set(sorted.slice(0, RENDER_CAP).map(n => n.data.id));
+  const nodes   = allNodes.filter(n => kept.has(n.data.id));
+  const edges   = allEdges.filter(e => kept.has(e.data.source) && kept.has(e.data.target));
+
+  return { nodes, edges, truncated: true };
+}
 
 async function main() {
   let graphData;
@@ -21,17 +53,22 @@ async function main() {
   document.getElementById('main-layout').classList.remove('hidden');
 
   // Populate plugin meta
-  const p = graphData.plugin || {};
+  const p          = graphData.plugin || {};
+  const totalNodes = (graphData.nodes || []).length;
+  const totalEdges = (graphData.edges || []).length;
   document.getElementById('plugin-name').textContent    = p.name || 'Unknown Plugin';
   document.getElementById('plugin-version').textContent = p.version ? `v${p.version}` : '';
-  document.getElementById('plugin-stats').textContent   =
-    `${(graphData.nodes || []).length} nodes · ${(graphData.edges || []).length} edges`;
+  document.getElementById('plugin-stats').textContent   = `${totalNodes} nodes · ${totalEdges} edges`;
 
-  // Build Cytoscape elements
-  const elements = [
-    ...(graphData.nodes || []),
-    ...(graphData.edges || []),
-  ];
+  // Cap elements for rendering
+  const { nodes, edges, truncated } = capElements(graphData.nodes || [], graphData.edges || []);
+
+  if (truncated) {
+    showTruncationBanner(totalNodes, nodes.length);
+  }
+
+  // Build Cytoscape elements from (possibly capped) set
+  const elements = [...nodes, ...edges];
 
   let currentNodeData = null;
 
@@ -42,23 +79,17 @@ async function main() {
       currentNodeData = nodeData;
       openSidebar(nodeData);
     },
-    (_nodeData, _pos) => {
-      // hover tooltip — handled by CSS/title attr; no custom implementation needed
-    },
-    (_nodeData) => {
-      // double-click: already zooms in graph.js
-    },
+    (_nodeData, _pos) => {},
+    (_nodeData) => {},
   );
 
+  // Search operates on ALL nodes (not just rendered), so pass full graphData
   initSidebar(cy);
-  initSearch(cy);
+  initSearch(cy, graphData.nodes || []);
 
-  // Auto-select layout: dagre works well for small connected graphs;
-  // CoSE handles large or sparse graphs without collapsing into a band.
-  const nodeCount = (graphData.nodes || []).length;
-  const edgeCount = (graphData.edges || []).length;
-  const density   = nodeCount > 0 ? edgeCount / nodeCount : 0;
-  const autoLayout = (nodeCount > 200 || density < 0.6) ? 'cose' : 'dagre';
+  // Auto-select layout based on rendered node count and density
+  const density    = nodes.length > 0 ? edges.length / nodes.length : 0;
+  const autoLayout = pickLayout(nodes.length, density);
 
   const layoutSelect = document.getElementById('layout-select');
   if (layoutSelect) {
@@ -66,7 +97,6 @@ async function main() {
     layoutSelect.addEventListener('change', () => applyLayout(cy, layoutSelect.value));
   }
 
-  // Apply the chosen layout (replaces the dagre default set in initCytoscape)
   applyLayout(cy, autoLayout);
 
   // Zoom controls — zoom toward the center of the viewport
@@ -87,6 +117,19 @@ async function main() {
       closeSidebar();
     }
   });
+}
+
+function showTruncationBanner(total, rendered) {
+  const banner = document.createElement('div');
+  banner.className = 'absolute top-14 left-1/2 -translate-x-1/2 z-10 bg-yellow-900 border border-yellow-600 text-yellow-200 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg';
+  banner.innerHTML = `
+    <span>⚠ Large graph: showing the ${rendered.toLocaleString()} most-connected of ${total.toLocaleString()} nodes. Use filters or search to explore.</span>
+    <button class="ml-2 text-yellow-400 hover:text-white font-bold" onclick="this.parentElement.remove()">✕</button>
+  `;
+  // Insert relative to #main-layout so positioning works
+  const layout = document.getElementById('main-layout');
+  layout.style.position = 'relative';
+  layout.prepend(banner);
 }
 
 // Bootstrap after DOM is ready

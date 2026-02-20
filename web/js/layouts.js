@@ -1,13 +1,10 @@
 export const LAYOUTS = {
   dagre: {
     name: 'dagre',
-    // TB = top-to-bottom ranks; hierarchy flows downward filling viewport height.
-    // With many nodes, TB spreads them across multiple columns naturally and
-    // avoids the single-row band that LR produces for wide dependency graphs.
     rankDir: 'TB',
     padding: 40,
-    nodeSep: 30,   // horizontal gap between nodes in the same rank
-    rankSep: 80,   // vertical gap between ranks (hierarchy levels)
+    nodeSep: 30,
+    rankSep: 80,
     ranker: 'network-simplex',
     animate: true,
     animationDuration: 400,
@@ -17,8 +14,6 @@ export const LAYOUTS = {
     animate: true,
     animationDuration: 800,
     padding: 60,
-    // High repulsion spreads isolated nodes across the canvas instead of
-    // collapsing them into a band (critical when ~40% of nodes have no edges).
     nodeRepulsion: 400000,
     idealEdgeLength: 100,
     edgeElasticity: 100,
@@ -38,16 +33,29 @@ export const LAYOUTS = {
   },
   grid: {
     name: 'grid',
-    animate: true,
-    animationDuration: 400,
+    animate: false,  // instant — grid is used for large graphs where animation would freeze
     padding: 50,
-    rows: undefined,
     avoidOverlap: true,
-    avoidOverlapPadding: 20,
+    avoidOverlapPadding: 10,
   },
 };
 
+// Thresholds
+const LARGE_GRAPH = 1000;  // switch to grid above this
+const SPARSE_GRAPH = 0.6;  // switch to cose below this density
+
+export function pickLayout(nodeCount, density) {
+  if (nodeCount > LARGE_GRAPH) return 'grid';
+  if (nodeCount > 200 || density < SPARSE_GRAPH) return 'cose';
+  return 'dagre';
+}
+
 export function applyLayout(cy, name) {
-  const config = LAYOUTS[name] || LAYOUTS.dagre;
+  // Disable animation for large graphs to prevent freezing
+  const count  = cy.nodes().length;
+  const config = { ...(LAYOUTS[name] || LAYOUTS.dagre) };
+  if (count > LARGE_GRAPH) {
+    config.animate = false;
+  }
   cy.layout(config).run();
 }

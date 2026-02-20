@@ -1,8 +1,10 @@
 let _cy = null;
 let _activeTypes = new Set();
+let _allNodes = null;  // full node list (may exceed rendered set)
 
-export function initSearch(cy) {
+export function initSearch(cy, allNodes = null) {
   _cy = cy;
+  _allNodes = allNodes;
 
   const allTypes = new Set(cy.nodes().map((n) => n.data('type')));
   _activeTypes = new Set(allTypes);
@@ -113,12 +115,21 @@ function applyFilters() {
 
 function populateAutocomplete() {
   const datalist = document.getElementById('node-labels');
-  if (!datalist || !_cy) return;
+  if (!datalist) return;
 
   datalist.innerHTML = '';
-  _cy.nodes().forEach((node) => {
+
+  // Use full node list if available (covers truncated graphs), else fall back to cy
+  const source = _allNodes
+    ? _allNodes.map(n => n.data.label).filter(Boolean)
+    : _cy.nodes().map(n => n.data('label')).filter(Boolean);
+
+  const seen = new Set();
+  source.forEach((label) => {
+    if (seen.has(label)) return;
+    seen.add(label);
     const opt = document.createElement('option');
-    opt.value = node.data('label');
+    opt.value = label;
     datalist.appendChild(opt);
   });
 }
