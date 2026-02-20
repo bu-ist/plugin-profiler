@@ -50,10 +50,10 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
      */
     private function addCallerEdge(string $targetId, string $label = 'registers'): void
     {
-        $callerId = $this->currentCallerId();
-        if ($callerId !== null) {
-            $this->collection->addEdge(Edge::make($callerId, $targetId, 'registers', $label));
-        }
+        $this->ensureFileNode();
+        $this->collection->addEdge(
+            Edge::make($this->currentCallerOrFileId(), $targetId, 'registers', $label)
+        );
     }
 
     private function handleRestRoute(Expr\FuncCall $node): void

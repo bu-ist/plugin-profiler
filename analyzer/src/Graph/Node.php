@@ -71,7 +71,7 @@ class Node
         return $clone;
     }
 
-    private static function sanitizeId(string $id): string
+    public static function sanitizeId(string $id): string
     {
         return preg_replace('/[^a-zA-Z0-9_\-]/', '_', $id) ?? $id;
     }

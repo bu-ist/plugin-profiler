@@ -8,6 +8,7 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeVisitorAbstract;
 use PluginProfiler\Graph\EntityCollection;
+use PluginProfiler\Graph\Node as GraphNode;
 
 /**
  * Base visitor that tracks the current namespace, class, and method/function context.
@@ -85,6 +86,72 @@ abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
         }
 
         return 'func_' . $this->currentMethod;
+    }
+
+    /**
+     * Ensure a file node exists for the current file in the collection.
+     * File nodes created here use the same ID scheme as FileVisitor so edges connect correctly.
+     */
+    protected function ensureFileNode(): void
+    {
+        $file   = $this->collection->getCurrentFile();
+        $nodeId = $this->currentFileNodeId();
+
+        if (!$this->collection->hasNode($nodeId)) {
+            $this->collection->addNode(GraphNode::make(
+                id: $nodeId,
+                label: basename($file),
+                type: 'file',
+                file: $file,
+                line: 0,
+            ));
+        }
+    }
+
+    /**
+     * Returns the node ID of the current file.
+     * Used as a fallback caller when code runs at file scope (outside any function/method).
+     * Must match the ID scheme used by FileVisitor::handleInclude().
+     */
+    protected function currentFileNodeId(): string
+    {
+        $file = $this->collection->getCurrentFile();
+
+        return GraphNode::sanitizeId('file_' . $this->toFileRelPath($file));
+    }
+
+    /**
+     * Returns the enclosing caller ID, falling back to the file node when at file scope.
+     */
+    protected function currentCallerOrFileId(): string
+    {
+        return $this->currentCallerId() ?? $this->currentFileNodeId();
+    }
+
+    /**
+     * Produce a relative path string from an absolute file path.
+     * Strips everything up to and including the deepest occurrence of a path separator
+     * followed by the remainder, using the path itself as a unique key.
+     * We keep the full path relative to the plugin root: the scanner always returns
+     * absolute paths rooted at the plugin dir, so strip the root prefix if possible.
+     */
+    private function toFileRelPath(string $absolutePath): string
+    {
+        $normalized = str_replace('\\', '/', $absolutePath);
+
+        // Strip leading slash so the ID matches FileVisitor's toRelative() output.
+        // FileVisitor strips pluginRoot then ltrim's slashes: "includes/class-lock.php"
+        // We don't have pluginRoot here, so strip everything up to the first path component
+        // that looks like a plugin root (heuristic: first segment after last /plugin/).
+        foreach (['/plugin/', '/app/'] as $marker) {
+            $pos = strrpos($normalized, $marker);
+            if ($pos !== false) {
+                return substr($normalized, $pos + strlen($marker));
+            }
+        }
+
+        // Fallback: use filename only — not ideal for uniqueness but better than nothing
+        return basename($normalized);
     }
 
     /**

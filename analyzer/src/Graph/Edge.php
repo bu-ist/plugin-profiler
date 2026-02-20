@@ -16,7 +16,9 @@ class Edge
 
     public static function make(string $source, string $target, string $type, string $label): self
     {
-        $id = sprintf('e_%s_%s_%s', $source, $type, $target);
+        $source = Node::sanitizeId($source);
+        $target = Node::sanitizeId($target);
+        $id     = sprintf('e_%s_%s_%s', $source, $type, $target);
 
         return new self(
             id: $id,

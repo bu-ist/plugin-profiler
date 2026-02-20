@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PluginProfiler\Parser\Visitors;
 
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\ComplexType;
 use PhpParser\Node\Identifier;
@@ -24,9 +25,37 @@ class FunctionVisitor extends NamespaceAwareVisitor
             $this->handleMethod($node);
         } elseif ($node instanceof Stmt\Function_) {
             $this->handleFunction($node);
+        } elseif ($node instanceof Expr\StaticCall) {
+            $this->handleStaticCall($node);
         }
 
         return null;
+    }
+
+    /**
+     * Detect ClassName::method() calls and create a 'calls' edge from the
+     * enclosing method/function to the called class node.
+     * This connects classes that collaborate via static accessors (e.g. singletons).
+     */
+    private function handleStaticCall(Expr\StaticCall $node): void
+    {
+        $callerId = $this->currentCallerId();
+        if ($callerId === null) {
+            return;
+        }
+
+        // Only handle named classes (not self/static/parent — those are intra-class)
+        if (!$node->class instanceof Node\Name) {
+            return;
+        }
+
+        $calledClass = $node->class->toString();
+        if (in_array($calledClass, ['self', 'static', 'parent'], true)) {
+            return;
+        }
+
+        $classId = 'class_' . $calledClass;
+        $this->collection->addEdge(Edge::make($callerId, $classId, 'calls', 'calls'));
     }
 
     private function handleMethod(Stmt\ClassMethod $node): void

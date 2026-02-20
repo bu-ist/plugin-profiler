@@ -75,8 +75,16 @@ class HookVisitor extends NamespaceAwareVisitor
             $callbackArg = $node->args[1]->value;
             $callbackIds = $this->resolveCallback($callbackArg, $node);
 
-            foreach ($callbackIds as $callbackId) {
-                $this->collection->addEdge(Edge::make($callbackId, $hookId, 'registers_hook', 'registers'));
+            if (!empty($callbackIds)) {
+                foreach ($callbackIds as $callbackId) {
+                    $this->collection->addEdge(Edge::make($callbackId, $hookId, 'registers_hook', 'registers'));
+                }
+            } else {
+                // Callback unresolved (e.g. file-scope or dynamic): use enclosing caller or file node
+                $this->ensureFileNode();
+                $this->collection->addEdge(
+                    Edge::make($this->currentCallerOrFileId(), $hookId, 'registers_hook', 'registers')
+                );
             }
 
             // If this is a wp_ajax_* hook, also link the hook node to the ajax_handler node
@@ -94,10 +102,10 @@ class HookVisitor extends NamespaceAwareVisitor
             }
         } else {
             // do_action / apply_filters: edge from caller → hook
-            $callerId = $this->currentCallerId();
-            if ($callerId !== null) {
-                $this->collection->addEdge(Edge::make($callerId, $hookId, 'triggers_hook', 'triggers'));
-            }
+            $this->ensureFileNode();
+            $this->collection->addEdge(
+                Edge::make($this->currentCallerOrFileId(), $hookId, 'triggers_hook', 'triggers')
+            );
         }
     }
 
