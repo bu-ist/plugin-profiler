@@ -148,12 +148,12 @@ fi
 
 # ── Build images ────────────────────────────────────────────────────────────
 info "Building containers..."
-docker compose "${COMPOSE_ARGS[@]}" "${PROFILE_ARGS[@]}" build analyzer web
+docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} build analyzer web
 
 # ── Run analyzer ────────────────────────────────────────────────────────────
 info "Running analysis..."
-if ! docker compose "${COMPOSE_ARGS[@]}" "${PROFILE_ARGS[@]}" run --rm \
-    "${ANALYZER_ENV[@]}" \
+if ! docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} run --rm \
+    ${ANALYZER_ENV[@]+"${ANALYZER_ENV[@]}"} \
     analyzer "${ANALYZER_CMD[@]}"; then
     error "Analysis failed. Check logs above."
     exit 1
