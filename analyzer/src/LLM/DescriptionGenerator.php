@@ -16,10 +16,14 @@ class DescriptionGenerator
 
     /**
      * Attach AI-generated descriptions to all nodes in the graph (in-place).
+     *
+     * @param callable(int $done, int $total): void|null $onProgress
      */
-    public function generate(Graph $graph): void
+    public function generate(Graph $graph, ?callable $onProgress = null): void
     {
         $batches = array_chunk($graph->nodes, $this->batchSize);
+        $total   = count($graph->nodes);
+        $done    = 0;
 
         foreach ($batches as $batch) {
             $entityBatch = array_map(fn (Node $n) => $this->buildEntityPayload($n, $graph), $batch);
@@ -28,6 +32,10 @@ class DescriptionGenerator
                 $descriptions = $this->client->generateDescriptions($entityBatch);
             } catch (\Throwable $e) {
                 fwrite(STDERR, "Warning: LLM batch failed: {$e->getMessage()}\n");
+                $done += count($batch);
+                if ($onProgress !== null) {
+                    ($onProgress)($done, $total);
+                }
                 continue;
             }
 
@@ -35,6 +43,11 @@ class DescriptionGenerator
                 if (isset($descriptions[$node->id])) {
                     $node->description = $descriptions[$node->id];
                 }
+            }
+
+            $done += count($batch);
+            if ($onProgress !== null) {
+                ($onProgress)($done, $total);
             }
         }
     }

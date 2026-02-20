@@ -9,15 +9,20 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Colour
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-info()  { echo -e "${GREEN}[plugin-profiler]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[plugin-profiler]${NC} $*"; }
-error() { echo -e "${RED}[plugin-profiler] ERROR:${NC} $*" >&2; }
+info()    { echo -e "${GREEN}▶${NC} $*"; }
+step()    { echo -e "${CYAN}  →${NC} $*"; }
+warn()    { echo -e "${YELLOW}⚠${NC}  $*"; }
+error()   { echo -e "${RED}✖${NC}  $*" >&2; }
+heading() { echo -e "\n${BOLD}$*${NC}"; }
 
 # ── Prerequisite checks ─────────────────────────────────────────────────────
 if ! command -v docker &>/dev/null; then
     error "Docker is not installed or not in PATH."
+    echo "  Install Docker Desktop: https://www.docker.com/products/docker-desktop/"
     exit 1
 fi
 
@@ -26,34 +31,48 @@ if ! docker compose version &>/dev/null; then
     exit 1
 fi
 
+if ! docker info &>/dev/null 2>&1; then
+    error "Docker is not running. Please start Docker Desktop and try again."
+    exit 1
+fi
+
 # ── Usage ───────────────────────────────────────────────────────────────────
 usage() {
     cat <<EOF
-Usage: plugin-profiler analyze <plugin-path> [options]
 
-Arguments:
+${BOLD}Plugin Profiler${NC} — WordPress plugin architecture visualizer
+
+${BOLD}Usage:${NC}
+  plugin-profiler analyze <plugin-path> [options]
+
+${BOLD}Arguments:${NC}
   <plugin-path>        Path to the WordPress plugin directory
 
-Options:
+${BOLD}Options:${NC}
   --port <n>           Port for web UI (default: 9000)
-  --llm <provider>     LLM provider: ollama, gemini, openai, deepseek (default: ollama)
-  --model <name>       LLM model name (default: qwen2.5-coder:7b)
-  --api-key <key>      API key for external LLM provider
-  --no-descriptions    Skip LLM description generation
-  --json-only          Output JSON only, do not start web server
+  --llm <provider>     Enable AI descriptions: ollama, gemini, openai, deepseek
+  --model <name>       LLM model name (default: qwen2.5-coder:7b for ollama)
+  --api-key <key>      API key for gemini / openai / deepseek
+  --no-descriptions    Skip AI descriptions (faster, offline)
+  --json-only          Write JSON only, skip web UI
   --output <dir>       Output directory inside container (default: /output)
-  --help               Show this help message
+  --help               Show this help
 
-Examples:
-  plugin-profiler analyze ./my-plugin
+${BOLD}Quick start (no AI):${NC}
   plugin-profiler analyze ./my-plugin --no-descriptions
-  plugin-profiler analyze ./my-plugin --llm gemini --api-key sk-xxx
-  plugin-profiler analyze ./my-plugin --port 8080 --json-only
+
+${BOLD}With AI descriptions (local, free — downloads ~4 GB model first time):${NC}
+  plugin-profiler analyze ./my-plugin --llm ollama
+
+${BOLD}With AI descriptions (cloud, instant):${NC}
+  plugin-profiler analyze ./my-plugin --llm gemini --api-key YOUR_KEY
+  plugin-profiler analyze ./my-plugin --llm openai  --api-key sk-...
+
 EOF
 }
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
-if [[ $# -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
     usage
     exit 0
 fi
@@ -83,8 +102,8 @@ fi
 
 # Defaults
 PORT=9000
-LLM_PROVIDER=ollama
-LLM_MODEL="qwen2.5-coder:7b"
+LLM_PROVIDER=""
+LLM_MODEL=""
 API_KEY=""
 NO_DESCRIPTIONS=false
 JSON_ONLY=false
@@ -93,88 +112,146 @@ OUTPUT_DIR="/output"
 # Parse remaining options
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --port)        PORT="$2";        shift 2 ;;
-        --llm)         LLM_PROVIDER="$2"; shift 2 ;;
-        --model)       LLM_MODEL="$2";   shift 2 ;;
-        --api-key)     API_KEY="$2";     shift 2 ;;
+        --port)            PORT="$2";         shift 2 ;;
+        --llm)             LLM_PROVIDER="$2"; shift 2 ;;
+        --model)           LLM_MODEL="$2";    shift 2 ;;
+        --api-key)         API_KEY="$2";      shift 2 ;;
         --no-descriptions) NO_DESCRIPTIONS=true; shift ;;
-        --json-only)   JSON_ONLY=true;   shift ;;
-        --output)      OUTPUT_DIR="$2";  shift 2 ;;
-        --help|-h)     usage; exit 0 ;;
+        --json-only)       JSON_ONLY=true;    shift ;;
+        --output)          OUTPUT_DIR="$2";   shift 2 ;;
+        --help|-h)         usage; exit 0 ;;
         *) error "Unknown option: $1"; usage; exit 1 ;;
     esac
 done
+
+# Resolve LLM defaults
+if [[ -z "$LLM_PROVIDER" ]] && ! $NO_DESCRIPTIONS; then
+    # No --llm and no --no-descriptions: default to no descriptions for speed
+    # unless an API key is in environment
+    if [[ -n "${LLM_API_KEY:-}" ]]; then
+        LLM_PROVIDER="${LLM_PROVIDER:-${LLM_PROVIDER:-ollama}}"
+    else
+        NO_DESCRIPTIONS=true
+    fi
+fi
+
+if [[ -z "$LLM_MODEL" ]]; then
+    case "${LLM_PROVIDER:-}" in
+        ollama)   LLM_MODEL="qwen2.5-coder:7b" ;;
+        gemini)   LLM_MODEL="gemini-2.0-flash" ;;
+        openai)   LLM_MODEL="gpt-4o-mini" ;;
+        deepseek) LLM_MODEL="deepseek-chat" ;;
+        *)        LLM_MODEL="qwen2.5-coder:7b" ;;
+    esac
+fi
 
 # ── Resolve plugin path ─────────────────────────────────────────────────────
 export PLUGIN_PATH
 PLUGIN_PATH="$(realpath "$PLUGIN_ARG")"
 export PORT
 
-info "Plugin: $PLUGIN_PATH"
-info "Port:   $PORT"
-info "LLM:    $LLM_PROVIDER ($LLM_MODEL)"
+# ── Summary ─────────────────────────────────────────────────────────────────
+heading "Plugin Profiler"
+step "Plugin:  $PLUGIN_PATH"
+step "Port:    $PORT"
+if $NO_DESCRIPTIONS; then
+    step "AI:      disabled (--no-descriptions)"
+else
+    step "AI:      $LLM_PROVIDER / $LLM_MODEL"
+fi
+echo ""
 
 # ── Build compose arguments ─────────────────────────────────────────────────
 COMPOSE_ARGS=("--project-directory" "$PROJECT_DIR")
-ANALYZER_ENV=(-e "LLM_PROVIDER=$LLM_PROVIDER" -e "LLM_MODEL=$LLM_MODEL")
+ANALYZER_ENV=(
+    -e "LLM_PROVIDER=${LLM_PROVIDER:-ollama}"
+    -e "LLM_MODEL=$LLM_MODEL"
+)
 
 if [[ -n "$API_KEY" ]]; then
     ANALYZER_ENV+=(-e "LLM_API_KEY=$API_KEY")
+elif [[ -n "${LLM_API_KEY:-}" ]]; then
+    ANALYZER_ENV+=(-e "LLM_API_KEY=${LLM_API_KEY}")
 fi
 
 ANALYZER_CMD=("/plugin")
-
-if $NO_DESCRIPTIONS; then
-    ANALYZER_CMD+=("--no-descriptions")
-fi
-
-if $JSON_ONLY; then
-    ANALYZER_CMD+=("--json-only")
-fi
-
+$NO_DESCRIPTIONS && ANALYZER_CMD+=("--no-descriptions")
+$JSON_ONLY       && ANALYZER_CMD+=("--json-only")
 ANALYZER_CMD+=("--output" "$OUTPUT_DIR")
 
 # ── Determine LLM profile ───────────────────────────────────────────────────
 USE_LLM_PROFILE=false
-if ! $NO_DESCRIPTIONS && [[ "$LLM_PROVIDER" == "ollama" ]]; then
+if ! $NO_DESCRIPTIONS && [[ "${LLM_PROVIDER:-}" == "ollama" ]]; then
     USE_LLM_PROFILE=true
 fi
 
 PROFILE_ARGS=()
 if $USE_LLM_PROFILE; then
     PROFILE_ARGS+=("--profile" "llm")
-    info "Starting with Ollama LLM container..."
 fi
 
 # ── Build images ────────────────────────────────────────────────────────────
-info "Building containers..."
-docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} build analyzer web
+info "Building containers (first run may take a minute)..."
+docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} build analyzer web 2>&1 \
+    | grep -v "^#" | grep -v "^$" | sed 's/^/  /' || true
+echo ""
+
+# ── Auto-pull Ollama model ──────────────────────────────────────────────────
+if $USE_LLM_PROFILE; then
+    info "Starting Ollama..."
+    docker compose "${COMPOSE_ARGS[@]}" --profile llm up -d ollama
+
+    # Wait for Ollama to be ready
+    step "Waiting for Ollama to be ready..."
+    for i in $(seq 1 30); do
+        if docker compose "${COMPOSE_ARGS[@]}" --profile llm exec -T ollama \
+               ollama list &>/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+
+    # Check if model is already present
+    OLLAMA_CONTAINER="$(docker compose "${COMPOSE_ARGS[@]}" --profile llm ps -q ollama)"
+    if ! docker exec "$OLLAMA_CONTAINER" ollama list 2>/dev/null | grep -q "$LLM_MODEL"; then
+        echo ""
+        warn "Model '$LLM_MODEL' not found locally."
+        info "Downloading model '$LLM_MODEL' (~4 GB, one-time download)..."
+        step "This will be cached for future runs."
+        echo ""
+        docker exec "$OLLAMA_CONTAINER" ollama pull "$LLM_MODEL"
+        echo ""
+    else
+        step "Model '$LLM_MODEL' already downloaded."
+    fi
+fi
 
 # ── Run analyzer ────────────────────────────────────────────────────────────
-info "Running analysis..."
+info "Analyzing plugin..."
+echo ""
 if ! docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} run --rm \
     ${ANALYZER_ENV[@]+"${ANALYZER_ENV[@]}"} \
     analyzer "${ANALYZER_CMD[@]}"; then
-    error "Analysis failed. Check logs above."
+    echo ""
+    error "Analysis failed. Check output above."
     exit 1
 fi
-
-info "Analysis complete."
+echo ""
 
 # ── Start web server (unless json-only) ─────────────────────────────────────
 if ! $JSON_ONLY; then
-    info "Starting web server on port $PORT..."
+    info "Starting web server..."
     docker compose "${COMPOSE_ARGS[@]}" up -d web
 
     URL="http://localhost:$PORT"
-    info "Graph available at: $URL"
+    echo ""
+    echo -e "  ${BOLD}${GREEN}✔ Ready!${NC}  Open ${CYAN}${URL}${NC} in your browser."
+    echo ""
 
     # Open browser
     if command -v open &>/dev/null; then
         open "$URL"
     elif command -v xdg-open &>/dev/null; then
         xdg-open "$URL"
-    else
-        warn "Could not auto-open browser. Visit: $URL"
     fi
 fi

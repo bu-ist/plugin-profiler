@@ -142,7 +142,7 @@ class AnalyzeCommand extends Command
             $batchSize   = (int) (getenv('LLM_BATCH_SIZE') ?: 25);
             $timeout     = (int) (getenv('LLM_TIMEOUT') ?: 120);
 
-            $output->writeln(sprintf('<comment>Generating descriptions via %s...</comment>', $llmProvider));
+            $output->writeln(sprintf('<comment>Generating descriptions via %s (%s)...</comment>', $llmProvider, $llmModel));
 
             if ($llmProvider === 'ollama') {
                 $ollamaHost = (string) (getenv('OLLAMA_HOST') ?: 'http://ollama:11434');
@@ -151,9 +151,17 @@ class AnalyzeCommand extends Command
                 $client = ApiClient::forProvider($llmProvider, $apiKey, $llmModel, min($timeout, 60));
             }
 
-            $generator = new DescriptionGenerator($client, $batchSize);
-            $generator->generate($graph);
-            $output->writeln('  Descriptions generated.');
+            $totalNodes = count($graph->nodes);
+            $generator  = new DescriptionGenerator($client, $batchSize);
+            $generator->generate($graph, function (int $done, int $total) use ($output): void {
+                $output->write(sprintf(
+                    "\r  Describing entities: %d / %d",
+                    $done,
+                    $total,
+                ));
+            });
+            $output->writeln('');
+            $output->writeln(sprintf('  Done. %d entities described.', $totalNodes));
         }
 
         // Step 6: Export
