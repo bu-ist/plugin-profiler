@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900 text-white">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plugin Profiler</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Prism.js (syntax highlighting) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-php.min.js" defer></script>
+
+  <!-- Cytoscape.js + dagre layout -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <script>
+    // Make dagre available for graph.js
+    window.cytoscapeDagre = cytoscapeDagre;
+  </script>
+
+  <style>
+    #cy {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+    #sidebar {
+      width: 400px;
+      min-width: 320px;
+      max-width: 500px;
+      overflow-y: auto;
+    }
+    .type-filter-btn.opacity-30 {
+      opacity: 0.3;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col">
+
+  <!-- Toolbar -->
+  <header class="h-12 bg-gray-800 border-b border-gray-700 flex items-center gap-3 px-4 shrink-0">
+    <div class="flex items-center gap-2 mr-2 shrink-0">
+      <span class="text-pink-400 font-bold text-sm">&#x25CE;</span>
+      <span id="plugin-name" class="font-semibold text-sm truncate max-w-[180px]">Plugin Profiler</span>
+      <span id="plugin-version" class="text-gray-400 text-xs"></span>
+    </div>
+
+    <!-- Search -->
+    <div class="relative">
+      <input
+        id="search-input"
+        type="search"
+        list="node-labels"
+        placeholder="Search nodes… (/)"
+        class="bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-1 text-sm w-52 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        autocomplete="off"
+      />
+      <datalist id="node-labels"></datalist>
+    </div>
+
+    <!-- Type filters -->
+    <div id="type-filters" class="flex flex-wrap gap-1 min-w-0 overflow-hidden"></div>
+
+    <div class="ml-auto flex items-center gap-2 shrink-0">
+      <!-- Stats -->
+      <span id="plugin-stats" class="text-gray-400 text-xs"></span>
+
+      <!-- Layout -->
+      <select
+        id="layout-select"
+        class="bg-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      >
+        <option value="dagre">Dagre (hierarchy)</option>
+        <option value="cose">CoSE (force)</option>
+        <option value="breadthfirst">Breadth-first</option>
+        <option value="grid">Grid</option>
+      </select>
+
+      <!-- Zoom controls -->
+      <button id="zoom-in"  class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom In">+</button>
+      <button id="zoom-out" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom Out">−</button>
+      <button id="zoom-fit" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Fit (F)">Fit</button>
+    </div>
+  </header>
+
+  <!-- Loading state -->
+  <div id="loading" class="flex-1 flex items-center justify-center">
+    <p class="text-gray-400">Loading graph data…</p>
+  </div>
+
+  <!-- Main layout (hidden until data loads) -->
+  <div id="main-layout" class="hidden flex-1 flex min-h-0">
+    <!-- Graph canvas -->
+    <div id="cy" class="flex-1 bg-gray-950"></div>
+
+    <!-- Sidebar -->
+    <aside
+      id="sidebar"
+      class="hidden flex-col bg-gray-800 border-l border-gray-700 p-4 overflow-y-auto text-sm"
+    ></aside>
+  </div>
+
+  <!-- Keyboard shortcut hint -->
+  <footer class="h-6 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-gray-500 text-xs shrink-0">
+    <kbd>/</kbd>&nbsp;search &nbsp;·&nbsp; <kbd>F</kbd>&nbsp;fit &nbsp;·&nbsp; <kbd>Esc</kbd>&nbsp;close sidebar &nbsp;·&nbsp; <kbd>1-9</kbd>&nbsp;toggle types &nbsp;·&nbsp; double-click node to zoom
+  </footer>
+
+  <!-- App entry point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

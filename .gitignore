@@ -1,0 +1,52 @@
+# ─── Environment ────────────────────────────────────────────────────────────
+.env
+*.env.local
+
+# ─── PHP / Composer ─────────────────────────────────────────────────────────
+analyzer/vendor/
+analyzer/composer.lock
+
+# PHP CS Fixer cache
+analyzer/.php-cs-fixer.cache
+.php_cs.cache
+
+# PHPUnit cache / coverage
+.phpunit.cache/
+.phpunit.result.cache
+coverage/
+
+# ─── JavaScript / Node ──────────────────────────────────────────────────────
+web/node_modules/
+web/package-lock.json
+
+# ─── Docker ─────────────────────────────────────────────────────────────────
+# Local output from docker compose runs
+output/
+
+# ─── OS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ─── IDE / Editors ───────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.nova/
+
+# ─── Logs ───────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Misc ───────────────────────────────────────────────────────────────────
+.claude/settings.local.json

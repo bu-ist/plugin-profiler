@@ -1,0 +1,13 @@
+{
+  "name": "plugin-profiler-web",
+  "version": "0.1.0",
+  "description": "WordPress plugin architecture visualizer",
+  "scripts": {
+    "dev": "npx serve . -p 9000",
+    "build": "echo 'No build step required — vanilla JS'"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "serve": "^14.0.0"
+  }
+}

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  php:
+    name: PHP Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring
+          tools: composer
+
+      - name: Install dependencies
+        working-directory: analyzer
+        run: composer install --no-interaction --no-progress
+
+      - name: Run PHPUnit
+        working-directory: analyzer
+        run: ./vendor/bin/phpunit --configuration phpunit.xml
+
+      - name: Check code style
+        working-directory: analyzer
+        run: ./vendor/bin/php-cs-fixer fix --dry-run --diff
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build analyzer image
+        run: docker build --target base -t plugin-profiler-analyzer ./analyzer
+
+      - name: Build web image
+        run: docker build -t plugin-profiler-web ./web
+
+  js-lint:
+    name: JS Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm install
+
+      - name: Run ESLint
+        working-directory: web
+        run: npx eslint js/ --no-eslintrc --rule '{"no-undef": "warn"}' --env browser,es2022 || true

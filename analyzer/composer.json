@@ -1,0 +1,30 @@
+{
+    "name": "plugin-profiler/analyzer",
+    "description": "WordPress plugin static analysis tool",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.1",
+        "nikic/php-parser": "^5.0",
+        "symfony/console": "^6.4",
+        "mck89/peast": "^1.16"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PluginProfiler\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PluginProfiler\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

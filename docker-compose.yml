@@ -1,0 +1,39 @@
+services:
+  analyzer:
+    build:
+      context: ./analyzer
+      dockerfile: Dockerfile
+      target: base
+    volumes:
+      - ${PLUGIN_PATH:-./sample-plugin}:/plugin:ro
+      - output:/output
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder:7b}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - LLM_BATCH_SIZE=${LLM_BATCH_SIZE:-25}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-120}
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-9000}:80"
+    volumes:
+      - output:/usr/share/nginx/html/data:ro
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    profiles:
+      - llm
+
+volumes:
+  output:
+  ollama_models:
