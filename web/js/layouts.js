@@ -43,7 +43,11 @@ export const LAYOUTS = {
 // Thresholds
 const LARGE_GRAPH  = 1000;  // switch to grid above this
 const MEDIUM_GRAPH = 300;   // switch to cose above this
-const SPARSE_GRAPH = 0.3;   // switch to cose below this density (very sparse = tree-like)
+// True graph density (0–1). A PHP class hierarchy sits around 0.01–0.08.
+// A pure JS/React star graph (file→component) is < 0.01.
+// Dagre shines on true DAGs; CoSE handles clusters and stars better.
+// We use 0.08 as the cutoff — below this density CoSE wins.
+const SPARSE_GRAPH = 0.08;
 
 export function pickLayout(nodeCount, density) {
   if (nodeCount > LARGE_GRAPH)  return 'grid';

@@ -115,8 +115,11 @@ async function main() {
   initSidebar(cy);
   initSearch(cy, graphData.nodes || []);
 
-  // Auto-select layout based on rendered node count and density
-  const density    = nodes.length > 0 ? edges.length / nodes.length : 0;
+  // Auto-select layout based on rendered node count and graph density.
+  // True density = edges / max-possible-edges; range 0–1.
+  // A file→entity star graph (e.g. pure React) has very low density (<0.05).
+  const maxEdges = nodes.length > 1 ? (nodes.length * (nodes.length - 1)) / 2 : 1;
+  const density  = edges.length / maxEdges;
   const autoLayout = pickLayout(nodes.length, density);
 
   const layoutSelect = document.getElementById('layout-select');
