@@ -130,6 +130,8 @@ class AnalyzeCommand extends Command
             totalEntities: $totalEntities,
             analyzedAt: new DateTimeImmutable(),
             hostPath: $hostPath,
+            phpFiles: count($phpFiles),
+            jsFiles: count($jsFiles),
         );
 
         $graph = (new GraphBuilder())->build($collection, $meta);

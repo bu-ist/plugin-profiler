@@ -18,5 +18,7 @@ class PluginMetadata
         public readonly \DateTimeImmutable $analyzedAt,
         public readonly string $analyzerVersion = self::ANALYZER_VERSION,
         public readonly string $hostPath = '',
+        public readonly int $phpFiles = 0,
+        public readonly int $jsFiles = 0,
     ) {}
 }

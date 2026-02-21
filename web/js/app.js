@@ -49,15 +49,30 @@ async function main() {
     return;
   }
 
-  // Handle empty graph — likely not a WordPress plugin
+  // Handle empty graph
   if (!graphData.nodes || graphData.nodes.length === 0) {
+    const p         = graphData.plugin || {};
+    const fileCount = p.total_files || 0;
+    const hasPhp    = p.php_files   || 0;
+    const hasJs     = p.js_files    || 0;
+
+    let hint = '';
+    if (fileCount === 0) {
+      hint = 'No files were found. Check that the path points to a plugin directory.';
+    } else if (hasJs > 0 && hasPhp === 0) {
+      hint = `${fileCount} file(s) scanned — all JavaScript, no PHP found. This looks like a standalone JS/React app rather than a WordPress plugin. If this is a block plugin, make sure the PHP entry file is present.`;
+    } else if (hasPhp > 0) {
+      hint = `${fileCount} file(s) scanned including ${hasPhp} PHP file(s), but no WordPress entities were detected. The plugin may not use standard WordPress hook/class patterns.`;
+    } else {
+      hint = `${fileCount} file(s) scanned but no WordPress entities were detected.`;
+    }
+
     document.getElementById('loading').innerHTML = `
-      <div class="text-center max-w-md">
-        <p class="text-yellow-400 text-lg font-semibold mb-2">No entities found</p>
-        <p class="text-gray-400 text-sm mb-4">The analyzer didn't detect any WordPress entities in this directory.</p>
-        <p class="text-gray-500 text-xs">Plugin Profiler looks for PHP classes, hooks, REST endpoints, and WordPress patterns.
-        Pure JavaScript/React apps without a PHP plugin layer won't produce results.</p>
-        ${graphData.plugin?.name ? `<p class="text-gray-600 text-xs mt-3">Plugin: ${graphData.plugin.name} · ${graphData.plugin.total_files} files scanned</p>` : ''}
+      <div class="text-center max-w-lg px-6">
+        <p class="text-yellow-400 text-lg font-semibold mb-3">No entities found</p>
+        <p class="text-gray-400 text-sm mb-4">${hint}</p>
+        <p class="text-gray-500 text-xs leading-relaxed">Plugin Profiler analyzes PHP classes, WordPress hooks, REST endpoints, AJAX handlers, data sources, Gutenberg blocks, and file dependencies. React/JS build artifacts are also scanned for <code class="text-gray-400">registerBlockType</code> and <code class="text-gray-400">wp.hooks</code> calls.</p>
+        ${p.name ? `<p class="text-gray-600 text-xs mt-4">Analyzed: <span class="text-gray-500">${p.name}</span></p>` : ''}
       </div>`;
     return;
   }

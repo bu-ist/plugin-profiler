@@ -30,6 +30,8 @@ class JsonExporter
                 'analyzed_at'      => $graph->plugin->analyzedAt->format(\DateTimeInterface::ATOM),
                 'analyzer_version' => $graph->plugin->analyzerVersion,
                 'host_path'        => $graph->plugin->hostPath,
+                'php_files'        => $graph->plugin->phpFiles,
+                'js_files'         => $graph->plugin->jsFiles,
             ],
             'nodes' => array_map(fn (Node $n) => ['data' => $this->serializeNode($n)], $graph->nodes),
             'edges' => array_map(fn ($e) => ['data' => [
