@@ -1,10 +1,10 @@
 export const LAYOUTS = {
   dagre: {
     name: 'dagre',
-    rankDir: 'TB',
+    rankDir: 'LR',          // left-to-right reads better for dependency graphs
     padding: 40,
-    nodeSep: 30,
-    rankSep: 80,
+    nodeSep: 20,
+    rankSep: 60,
     ranker: 'network-simplex',
     animate: true,
     animationDuration: 400,
@@ -12,12 +12,12 @@ export const LAYOUTS = {
   cose: {
     name: 'cose',
     animate: true,
-    animationDuration: 800,
-    padding: 60,
-    nodeRepulsion: 400000,
-    idealEdgeLength: 100,
-    edgeElasticity: 100,
-    gravity: 25,
+    animationDuration: 600,
+    padding: 50,
+    nodeRepulsion: 120000,   // was 400000 — lower = tighter clusters
+    idealEdgeLength: 60,     // was 100 — shorter edges = more compact
+    edgeElasticity: 80,
+    gravity: 80,             // was 25 — higher = pulls graph to center
     numIter: 1000,
     initialTemp: 200,
     coolingFactor: 0.95,
@@ -41,13 +41,15 @@ export const LAYOUTS = {
 };
 
 // Thresholds
-const LARGE_GRAPH = 1000;  // switch to grid above this
-const SPARSE_GRAPH = 0.6;  // switch to cose below this density
+const LARGE_GRAPH  = 1000;  // switch to grid above this
+const MEDIUM_GRAPH = 300;   // switch to cose above this
+const SPARSE_GRAPH = 0.3;   // switch to cose below this density (very sparse = tree-like)
 
 export function pickLayout(nodeCount, density) {
-  if (nodeCount > LARGE_GRAPH) return 'grid';
-  if (nodeCount > 200 || density < SPARSE_GRAPH) return 'cose';
-  return 'dagre';
+  if (nodeCount > LARGE_GRAPH)  return 'grid';
+  if (nodeCount > MEDIUM_GRAPH) return 'cose';
+  if (density < SPARSE_GRAPH)   return 'cose';
+  return 'dagre';  // default: structured left-to-right hierarchy
 }
 
 export function applyLayout(cy, name) {
