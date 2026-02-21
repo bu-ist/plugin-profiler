@@ -49,6 +49,19 @@ async function main() {
     return;
   }
 
+  // Handle empty graph — likely not a WordPress plugin
+  if (!graphData.nodes || graphData.nodes.length === 0) {
+    document.getElementById('loading').innerHTML = `
+      <div class="text-center max-w-md">
+        <p class="text-yellow-400 text-lg font-semibold mb-2">No entities found</p>
+        <p class="text-gray-400 text-sm mb-4">The analyzer didn't detect any WordPress entities in this directory.</p>
+        <p class="text-gray-500 text-xs">Plugin Profiler looks for PHP classes, hooks, REST endpoints, and WordPress patterns.
+        Pure JavaScript/React apps without a PHP plugin layer won't produce results.</p>
+        ${graphData.plugin?.name ? `<p class="text-gray-600 text-xs mt-3">Plugin: ${graphData.plugin.name} · ${graphData.plugin.total_files} files scanned</p>` : ''}
+      </div>`;
+    return;
+  }
+
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('main-layout').classList.remove('hidden');
 
