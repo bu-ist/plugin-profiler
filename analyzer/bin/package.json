@@ -1,0 +1,10 @@
+{
+  "name": "js-extractor",
+  "version": "1.0.0",
+  "description": "Babel-based JS/JSX/TS/TSX entity extractor for Plugin Profiler",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@babel/parser": "^7.24.0"
+  }
+}
