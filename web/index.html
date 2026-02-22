@@ -18,6 +18,9 @@
   <!-- dagre: hierarchical layout for directed graphs -->
   <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <!-- fCoSE peer deps: layout-base → cose-base must load before cytoscape-fcose -->
+  <script src="https://cdn.jsdelivr.net/npm/layout-base@2.0.1/layout-base.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cose-base@2.2.0/cose-base.js"></script>
   <!-- fCoSE: fast compound spring embedder — best default for mixed plugin graphs -->
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.min.js"></script>
   <!-- expand-collapse: collapse/expand compound namespace and directory groups -->
@@ -89,6 +92,9 @@
 
       <!-- Collapse/Expand all namespace groups -->
       <button id="collapse-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Collapse / Expand all groups">⊟ Groups</button>
+
+      <!-- Focus / Show-all toggle -->
+      <button id="focus-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Toggle between key nodes and full graph"><span id="focus-label">⊙ Key nodes</span></button>
 
       <!-- Zoom controls -->
       <button id="zoom-in"  class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom In">+</button>

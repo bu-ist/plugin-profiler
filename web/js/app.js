@@ -6,6 +6,22 @@ import { initSearch } from './search.js';
 // Max nodes to render in Cytoscape. Beyond this the browser hangs.
 const RENDER_CAP = 1500;
 
+// Focus view: seed with the N most-connected nodes, then expand 1 hop.
+// Keeps the initial view readable for typical plugins (40–100 nodes displayed).
+const FOCUS_PRIMARY = 40;
+
+// ── Module-level state ────────────────────────────────────────────────────────
+// Stored at module scope so the focus toggle can swap the rendered set without
+// re-fetching data or re-creating the Cytoscape instance.
+
+let _cy         = null;
+let _isFocused  = true;   // starts in focus mode
+let _allNodes   = [];     // full node list from graph-data.json (after render cap)
+let _allEdges   = [];     // full edge list from graph-data.json (after render cap)
+let _pluginMeta = {};
+
+// ── capElements ───────────────────────────────────────────────────────────────
+
 /**
  * Pick the most-connected nodes to render when the graph exceeds RENDER_CAP.
  * Prioritises nodes with the most edges so the rendered subgraph is meaningful.
@@ -28,12 +44,161 @@ function capElements(allNodes, allEdges) {
   const sorted = [...allNodes].sort((a, b) =>
     (degree[b.data.id] || 0) - (degree[a.data.id] || 0)
   );
-  const kept    = new Set(sorted.slice(0, RENDER_CAP).map(n => n.data.id));
-  const nodes   = allNodes.filter(n => kept.has(n.data.id));
-  const edges   = allEdges.filter(e => kept.has(e.data.source) && kept.has(e.data.target));
+  const kept  = new Set(sorted.slice(0, RENDER_CAP).map(n => n.data.id));
+  const nodes = allNodes.filter(n => kept.has(n.data.id));
+  const edges = allEdges.filter(e => kept.has(e.data.source) && kept.has(e.data.target));
 
   return { nodes, edges, truncated: true };
 }
+
+// ── buildFocusSet ─────────────────────────────────────────────────────────────
+
+/**
+ * Build the initial focus set: top FOCUS_PRIMARY nodes by degree plus any nodes
+ * in the plugin's main entry file, then expanded by 1 hop.
+ *
+ * Compound nodes (namespace/dir) are excluded — the focus view is a clean flat
+ * graph. They are restored when the user switches to "show all."
+ *
+ * @param {Array}  allNodes   - Full node list (already render-capped).
+ * @param {Array}  allEdges   - Full edge list (already render-capped).
+ * @param {Object} pluginMeta - plugin block from graph-data.json.
+ * @returns {{ nodes, edges, focusCount, totalCount }}
+ */
+function buildFocusSet(allNodes, allEdges, pluginMeta) {
+  // Count degree for every node
+  const degree = {};
+  for (const e of allEdges) {
+    degree[e.data.source] = (degree[e.data.source] || 0) + 1;
+    degree[e.data.target] = (degree[e.data.target] || 0) + 1;
+  }
+
+  // Exclude compound group nodes from seeding
+  const leafNodes = allNodes.filter(n => n.data.type !== 'namespace' && n.data.type !== 'dir');
+
+  // Seed: main-file nodes + top FOCUS_PRIMARY by degree
+  const primary  = new Set();
+  const mainFile = pluginMeta?.main_file;
+  leafNodes.forEach(n => {
+    if (mainFile && n.data.file?.endsWith(mainFile)) primary.add(n.data.id);
+  });
+  [...leafNodes]
+    .sort((a, b) => (degree[b.data.id] || 0) - (degree[a.data.id] || 0))
+    .slice(0, FOCUS_PRIMARY)
+    .forEach(n => primary.add(n.data.id));
+
+  // Expand 1 hop through edges (compound nodes won't be in primary, skip them)
+  const focusIds = new Set(primary);
+  allEdges.forEach(e => {
+    if (primary.has(e.data.source)) focusIds.add(e.data.target);
+    if (primary.has(e.data.target)) focusIds.add(e.data.source);
+  });
+
+  // Strip compound parent nodes and the parent reference from child data so the
+  // focus view renders as a clean flat graph without compound bounding boxes.
+  const nodes = leafNodes
+    .filter(n => focusIds.has(n.data.id))
+    .map(n => n.data.parent ? { data: { ...n.data, parent: undefined } } : n);
+  const edges = allEdges.filter(
+    e => focusIds.has(e.data.source) && focusIds.has(e.data.target)
+  );
+
+  return { nodes, edges, focusCount: nodes.length, totalCount: leafNodes.length };
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Update the focus/show-all toggle button label.
+ *
+ * @param {number} focusCount - Nodes currently rendered.
+ * @param {number} totalCount - Total available leaf nodes.
+ */
+function updateFocusButton(focusCount, totalCount) {
+  const lbl = document.getElementById('focus-label');
+  if (!lbl) return;
+  lbl.textContent = _isFocused
+    ? `⊙ Key nodes (${focusCount} / ${totalCount})`
+    : `⊛ All nodes (${totalCount})`;
+}
+
+/**
+ * Show or update the status banner describing the current view.
+ * In focus mode: "Showing N of M nodes — key nodes by connectivity. [Show all →]"
+ * Clicking the link switches to show-all mode. Banner is suppressed when focus
+ * set equals the full set (small plugin — nothing to trim).
+ *
+ * @param {number}  focusCount - Nodes currently rendered.
+ * @param {number}  totalCount - Total available leaf nodes.
+ * @param {boolean} isFocused  - Whether focus mode is active.
+ */
+function showStatusBanner(focusCount, totalCount, isFocused) {
+  // Remove any existing banner
+  document.getElementById('status-banner')?.remove();
+
+  // No banner needed when every node is visible
+  if (!isFocused || focusCount >= totalCount) return;
+
+  const layout = document.getElementById('main-layout');
+  if (!layout) return;
+  layout.style.position = 'relative';
+
+  const banner = document.createElement('div');
+  banner.id = 'status-banner';
+  banner.className = 'absolute top-14 left-1/2 -translate-x-1/2 z-10 bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg';
+  banner.innerHTML = `
+    <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
+    <button id="show-all-link" class="text-blue-400 hover:text-blue-300 underline whitespace-nowrap">Show all →</button>
+    <button class="ml-1 text-slate-500 hover:text-white font-bold" onclick="this.parentElement.remove()">✕</button>
+  `;
+  layout.prepend(banner);
+
+  document.getElementById('show-all-link')?.addEventListener('click', () => {
+    _isFocused = false;
+    switchView();
+  });
+}
+
+// ── switchView ────────────────────────────────────────────────────────────────
+
+/**
+ * Swap the Cytoscape element set between focus mode and show-all mode,
+ * then re-apply the selected layout.
+ */
+function switchView() {
+  if (!_cy) return;
+
+  _cy.batch(() => {
+    _cy.elements().remove();
+    if (_isFocused) {
+      const f = buildFocusSet(_allNodes, _allEdges, _pluginMeta);
+      _cy.add([...f.nodes, ...f.edges]);
+      updateFocusButton(f.focusCount, f.totalCount);
+      showStatusBanner(f.focusCount, f.totalCount, true);
+    } else {
+      _cy.add([..._allNodes, ..._allEdges]);
+      const leafCount = _allNodes.filter(
+        n => n.data.type !== 'namespace' && n.data.type !== 'dir'
+      ).length;
+      updateFocusButton(leafCount, leafCount);
+      showStatusBanner(leafCount, leafCount, false);
+    }
+  });
+
+  const layoutName = document.getElementById('layout-select')?.value || 'fcose';
+  const n          = _cy.nodes().length;
+  const maxEdges   = n > 1 ? (n * (n - 1)) / 2 : 1;
+  const density    = _cy.edges().length / maxEdges;
+  const autoLayout = pickLayout(n, density, _isFocused);
+
+  // In focus mode, update the layout selector to reflect the auto-pick
+  const layoutSelect = document.getElementById('layout-select');
+  if (layoutSelect && _isFocused) layoutSelect.value = autoLayout;
+
+  applyLayout(_cy, _isFocused ? autoLayout : layoutName);
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   let graphData;
@@ -89,75 +254,81 @@ async function main() {
   document.getElementById('plugin-stats').textContent   = `${totalNodes} nodes · ${totalEdges} edges`;
 
   // Cap elements for rendering
-  const { nodes, edges, truncated } = capElements(graphData.nodes || [], graphData.edges || []);
+  const { nodes, edges } = capElements(graphData.nodes || [], graphData.edges || []);
 
-  if (truncated) {
-    showTruncationBanner(totalNodes, nodes.length);
-  }
+  // Store module-level state for the focus toggle
+  _allNodes   = nodes;
+  _allEdges   = edges;
+  _pluginMeta = p;
+  _isFocused  = true;
 
-  // Build Cytoscape elements from (possibly capped) set
-  const elements = [...nodes, ...edges];
+  // Build initial focus set — flat, no compound nodes
+  const focused = buildFocusSet(_allNodes, _allEdges, _pluginMeta);
 
-  let currentNodeData = null;
-
-  const cy = initCytoscape(
+  // Initialise Cytoscape with just the focus set
+  _cy = initCytoscape(
     document.getElementById('cy'),
-    elements,
-    (nodeData) => {
-      currentNodeData = nodeData;
-      openSidebar(nodeData);
-    },
+    [...focused.nodes, ...focused.edges],
+    (nodeData) => { openSidebar(nodeData); },
     (_nodeData, _pos) => {},
     (_nodeData) => {},
   );
 
-  // Initialize the expand-collapse extension so the collapse button can retrieve
-  // the API handle via cy.expandCollapse('get'). layoutBy re-runs fCoSE after
-  // every group expansion or collapse, keeping the graph tidy without a full
-  // manual re-layout. 'draft' quality is intentionally chosen here for speed —
-  // the user just interacted and wants an immediate response.
-  cy.expandCollapse({
+  // Initialize expand-collapse extension. animate:false prevents the compound-node
+  // explosion that happens when physics runs frame-by-frame with nested elements.
+  _cy.expandCollapse({
     layoutBy: {
       name:              'fcose',
-      animate:           true,
-      animationDuration: 300,
+      animate:           false,
+      animationDuration: 0,
       quality:           'draft',
-      randomize:         false,
+      randomize:         true,
     },
     undoable:          false,
     fisheye:           false,
-    animate:           true,
-    animationDuration: 300,
+    animate:           false,
+    animationDuration: 0,
   });
 
   // Search operates on ALL nodes (not just rendered), so pass full graphData
-  initSidebar(cy);
-  initSearch(cy, graphData.nodes || []);
+  initSidebar(_cy);
+  initSearch(_cy, graphData.nodes || []);
 
-  // Auto-select layout based on rendered node count and graph density.
-  // True density = edges / max-possible-edges; range 0–1.
-  // A file→entity star graph (e.g. pure React) has very low density (<0.05).
-  const maxEdges = nodes.length > 1 ? (nodes.length * (nodes.length - 1)) / 2 : 1;
-  const density  = edges.length / maxEdges;
-  const autoLayout = pickLayout(nodes.length, density);
+  // Auto-select layout for the focus set (small, sparse → always fCoSE)
+  const maxEdges   = focused.nodes.length > 1
+    ? (focused.nodes.length * (focused.nodes.length - 1)) / 2
+    : 1;
+  const density    = focused.edges.length / maxEdges;
+  const autoLayout = pickLayout(focused.nodes.length, density, true);
 
   const layoutSelect = document.getElementById('layout-select');
   if (layoutSelect) {
     layoutSelect.value = autoLayout;
-    layoutSelect.addEventListener('change', () => applyLayout(cy, layoutSelect.value));
+    layoutSelect.addEventListener('change', () => {
+      // User is manually choosing a layout — stay in current view mode
+      applyLayout(_cy, layoutSelect.value);
+    });
   }
 
-  applyLayout(cy, autoLayout);
+  applyLayout(_cy, autoLayout);
+  updateFocusButton(focused.focusCount, focused.totalCount);
+  showStatusBanner(focused.focusCount, focused.totalCount, true);
+
+  // Focus/Show-all toggle button
+  document.getElementById('focus-btn')?.addEventListener('click', () => {
+    _isFocused = !_isFocused;
+    switchView();
+  });
 
   // Collapse/Expand toggle — requires the expand-collapse extension to be
   // initialised. The extension is registered in graph.js; the API is available
-  // via cy.expandCollapse('get') after the first call to cy.expandCollapse({}).
+  // via _cy.expandCollapse('get') after the first call to _cy.expandCollapse({}).
   document.getElementById('collapse-btn')?.addEventListener('click', () => {
-    const api      = cy.expandCollapse('get');
-    const hasGroups = cy.nodes('[type = "namespace"], [type = "dir"]').length > 0;
+    const api       = _cy.expandCollapse('get');
+    const hasGroups = _cy.nodes('[type = "namespace"], [type = "dir"]').length > 0;
     if (!api || !hasGroups) return;
 
-    const anyCollapsed = cy.nodes(':parent').some((n) => api.isCollapsed(n));
+    const anyCollapsed = _cy.nodes(':parent').some((n) => api.isCollapsed(n));
     if (anyCollapsed) {
       api.expandAll();
       document.getElementById('collapse-btn').textContent = '⊟ Groups';
@@ -169,15 +340,15 @@ async function main() {
 
   // Zoom controls — zoom toward the center of the viewport
   const zoomCenter = () => {
-    const ext = cy.extent();
+    const ext = _cy.extent();
     return {
       x: (ext.x1 + ext.x2) / 2,
       y: (ext.y1 + ext.y2) / 2,
     };
   };
-  document.getElementById('zoom-in')?.addEventListener('click',  () => cy.zoom({ level: cy.zoom() * 1.3, position: zoomCenter() }));
-  document.getElementById('zoom-out')?.addEventListener('click', () => cy.zoom({ level: cy.zoom() * 0.77, position: zoomCenter() }));
-  document.getElementById('zoom-fit')?.addEventListener('click', () => cy.fit());
+  document.getElementById('zoom-in')?.addEventListener('click',  () => _cy.zoom({ level: _cy.zoom() * 1.3,  position: zoomCenter() }));
+  document.getElementById('zoom-out')?.addEventListener('click', () => _cy.zoom({ level: _cy.zoom() * 0.77, position: zoomCenter() }));
+  document.getElementById('zoom-fit')?.addEventListener('click', () => _cy.fit());
 
   // Sidebar close button (delegated, since sidebar content is re-rendered)
   document.getElementById('sidebar')?.addEventListener('click', (e) => {
@@ -185,19 +356,6 @@ async function main() {
       closeSidebar();
     }
   });
-}
-
-function showTruncationBanner(total, rendered) {
-  const banner = document.createElement('div');
-  banner.className = 'absolute top-14 left-1/2 -translate-x-1/2 z-10 bg-yellow-900 border border-yellow-600 text-yellow-200 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg';
-  banner.innerHTML = `
-    <span>⚠ Large graph: showing the ${rendered.toLocaleString()} most-connected of ${total.toLocaleString()} nodes. Use filters or search to explore.</span>
-    <button class="ml-2 text-yellow-400 hover:text-white font-bold" onclick="this.parentElement.remove()">✕</button>
-  `;
-  // Insert relative to #main-layout so positioning works
-  const layout = document.getElementById('main-layout');
-  layout.style.position = 'relative';
-  layout.prepend(banner);
 }
 
 // Bootstrap after DOM is ready

@@ -35,17 +35,21 @@ export const LAYOUTS = {
     // 'default' = balanced                  (our standard)
     // 'proof'   = slow, highest quality     (for screenshots / exports)
     quality:                   'default',
-    animate:                   true,
-    animationDuration:         500,
-    padding:                   50,
+    // KEY FIX: compute final positions first, render once — prevents the
+    // compound-node "explosion" where bounding boxes grow frame-by-frame during
+    // the physics simulation when animate:true is combined with nested nodes.
+    randomize:                 true,     // always start fresh — avoids bad local minima
+    animate:                   false,
+    animationDuration:         0,
+    padding:                   40,
     nodeDimensionsIncludeLabels: true,
     uniformNodeDimensions:     false,
     packComponents:            true,    // pack disconnected subgraphs neatly
-    nodeRepulsion:             4500,
-    idealEdgeLength:           80,
+    nodeRepulsion:             2000,    // was 4500 — lower keeps compound children compact
+    idealEdgeLength:           50,      // was 80 — shorter edges keep groups tight
     edgeElasticity:            0.45,
-    nestingFactor:             0.1,
-    gravity:                   0.25,
+    nestingFactor:             0.01,    // was 0.1 — near-zero: minimal compound padding
+    gravity:                   0.4,     // was 0.25 — stronger pull keeps graph centered
     numIter:                   2500,
     gravityRange:              3.8,
   },
@@ -104,14 +108,15 @@ const SPARSE_GRAPH = 0.08;
  * Auto-select the best layout for a given graph.
  * Called once after data loads; the user can override via the dropdown.
  *
- * @param {number} nodeCount - Rendered node count.
- * @param {number} density   - True graph density: edges / (n*(n-1)/2).
+ * @param {number}  nodeCount - Rendered node count.
+ * @param {number}  density   - True graph density: edges / (n*(n-1)/2).
+ * @param {boolean} focused   - When true, always prefer fCoSE (focus sets are small and sparse).
  * @returns {'grid'|'fcose'|'dagre'} Layout name key from LAYOUTS.
  */
-export function pickLayout(nodeCount, density) {
-  if (nodeCount > LARGE_GRAPH)  return 'grid';
-  if (nodeCount > MEDIUM_GRAPH) return 'fcose';
-  if (density < SPARSE_GRAPH)   return 'fcose';
+export function pickLayout(nodeCount, density, focused = false) {
+  if (nodeCount > LARGE_GRAPH)              return 'grid';
+  if (nodeCount > MEDIUM_GRAPH)             return 'fcose';
+  if (focused || density < SPARSE_GRAPH)    return 'fcose';  // focus mode always prefers fCoSE
   return 'dagre';
 }
 

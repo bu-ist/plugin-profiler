@@ -103,9 +103,11 @@ function buildStylesheet() {
         'font-family':       'ui-monospace, monospace',
         'text-wrap':         'wrap',
         'text-max-width':    '160px',
-        'width':             'label',
-        'height':            'label',
+        // width/height auto-size to the label via padding — 'label' was
+        // deprecated in Cytoscape 3.33. Padding alone determines node size.
         'padding':           '14px',
+        'min-width':         '60px',
+        'min-height':        '28px',
         'border-width':      2,
         'border-color':      'rgba(255,255,255,0.25)',
         'background-color':  '#6B7280',
