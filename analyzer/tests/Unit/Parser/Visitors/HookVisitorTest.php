@@ -123,4 +123,22 @@ class HookVisitorTest extends TestCase
         $node = $this->collection->getNode('hook_action_init');
         $this->assertSame(20, $node?->metadata['priority']);
     }
+
+    public function testEnterNode_WithDynamicHookName_UsesReadableLabel(): void
+    {
+        // When the hook name is a variable (cannot be statically resolved),
+        // the label should be the readable string 'dynamic' rather than the
+        // hash-based ID used internally to keep nodes unique.
+        $this->parse('<?php add_action($hook_name, "my_func");');
+
+        $hooks = array_filter(
+            $this->collection->getAllNodes(),
+            static fn ($n) => $n->type === 'hook'
+        );
+
+        $this->assertNotEmpty($hooks);
+        $hook = reset($hooks);
+        $this->assertSame('dynamic', $hook->label, 'Dynamic hook name should produce a readable label');
+        $this->assertStringContainsString('dynamic_', $hook->id, 'Dynamic hook ID should contain hash for uniqueness');
+    }
 }

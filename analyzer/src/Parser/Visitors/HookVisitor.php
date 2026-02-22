@@ -47,12 +47,15 @@ class HookVisitor extends NamespaceAwareVisitor
         $hookType    = $isFilter ? 'filter' : 'action';
         $hookId      = 'hook_' . $hookType . '_' . $hookName;
 
+        // Dynamic hook names get a readable label instead of the hash used for ID uniqueness
+        $hookLabel = str_starts_with($hookName, 'dynamic_') ? 'dynamic' : $hookName;
+
         $file = $this->collection->getCurrentFile();
 
         // Create or ensure hook node exists
         $hookNode = GraphNode::make(
             id: $hookId,
-            label: $hookName,
+            label: $hookLabel,
             type: 'hook',
             file: $file,
             line: $node->getStartLine(),

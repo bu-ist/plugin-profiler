@@ -114,4 +114,24 @@ class FileScannerTest extends TestCase
             $this->assertContains($ext, ['js', 'jsx', 'ts', 'tsx']);
         }
     }
+
+    public function testScan_SkipsMinifiedJsFiles(): void
+    {
+        $files = $this->scanner->scan($this->fixtureDir);
+
+        foreach ($files as $file) {
+            $this->assertStringNotContainsString('.min.js', $file, "Minified file should be excluded: $file");
+            $this->assertStringNotContainsString('.build.js', $file, "Build bundle should be excluded: $file");
+        }
+    }
+
+    public function testScan_StillFindsSourceJsAfterMinifiedExclusion(): void
+    {
+        $files  = $this->scanner->scan($this->fixtureDir);
+        $jsFiles = array_filter($files, static fn (string $f) => str_ends_with($f, '.js'));
+
+        // src/index.js should still be present; minified files excluded
+        $basenames = array_map('basename', $jsFiles);
+        $this->assertContains('index.js', $basenames, 'Source JS files should still be scanned');
+    }
 }

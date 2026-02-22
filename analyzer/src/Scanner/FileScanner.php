@@ -13,6 +13,12 @@ class FileScanner
     /** Always-skipped directory names regardless of ignore files. */
     private const SKIP_DIRECTORIES = ['vendor', 'node_modules', '.git'];
 
+    /**
+     * Filename suffixes that indicate a minified or compiled bundle.
+     * These files contain single-letter mangled identifiers that produce useless nodes.
+     */
+    private const MINIFIED_SUFFIXES = ['.min.js', '.build.js', '.bundle.js', '.chunk.js'];
+
     private const PHP_EXTENSIONS = ['php'];
     private const JS_EXTENSIONS  = ['js', 'jsx', 'ts', 'tsx'];
 
@@ -65,7 +71,7 @@ class FileScanner
                 continue;
             }
 
-            if (in_array($extension, self::JS_EXTENSIONS, true)) {
+            if (in_array($extension, self::JS_EXTENSIONS, true) && !$this->isMinifiedFile($basename)) {
                 $files[] = $realPath;
             }
         }
@@ -269,6 +275,21 @@ class FileScanner
         return array_values(
             array_filter($files, static fn (string $f) => str_ends_with($f, '.php'))
         );
+    }
+
+    /**
+     * Returns true for minified or compiled bundle files (*.min.js, *.build.js, etc.)
+     * that contain mangled single-letter identifiers and produce useless nodes.
+     */
+    private function isMinifiedFile(string $basename): bool
+    {
+        foreach (self::MINIFIED_SUFFIXES as $suffix) {
+            if (str_ends_with($basename, $suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function toRelative(string $absolutePath, string $baseDir): string
