@@ -6,9 +6,15 @@ import { initSearch } from './search.js';
 // Max nodes to render in Cytoscape. Beyond this the browser hangs.
 const RENDER_CAP = 1500;
 
-// Focus view: seed with the N most-connected nodes, then expand 1 hop.
-// Keeps the initial view readable for typical plugins (40–100 nodes displayed).
+// Focus view: seed with the N most-connected nodes, then expand 1 hop up to FOCUS_CAP.
 const FOCUS_PRIMARY = 40;
+
+// Hard cap on the focus set after 1-hop expansion.
+// Prevents large densely-connected plugins (1000+ nodes) from expanding the
+// focus set to hundreds of nodes. 1-hop neighbors are added in degree order
+// until this limit is reached. Small plugins that never reach the cap are
+// unaffected — they show their full focus neighbourhood.
+const FOCUS_CAP = 100;
 
 // ── Module-level state ────────────────────────────────────────────────────────
 // Stored at module scope so the focus toggle can swap the rendered set without
@@ -87,12 +93,21 @@ function buildFocusSet(allNodes, allEdges, pluginMeta) {
     .slice(0, FOCUS_PRIMARY)
     .forEach(n => primary.add(n.data.id));
 
-  // Expand 1 hop through edges (compound nodes won't be in primary, skip them)
+  // Expand 1 hop — capped to FOCUS_CAP so large densely-connected plugins
+  // don't balloon the focus set to hundreds of nodes.
+  // 1-hop candidates are sorted by degree so the most-connected neighbours
+  // are always included first.
   const focusIds = new Set(primary);
-  allEdges.forEach(e => {
-    if (primary.has(e.data.source)) focusIds.add(e.data.target);
-    if (primary.has(e.data.target)) focusIds.add(e.data.source);
-  });
+  if (focusIds.size < FOCUS_CAP) {
+    const oneHop = new Set();
+    allEdges.forEach(e => {
+      if (primary.has(e.data.source) && !primary.has(e.data.target)) oneHop.add(e.data.target);
+      if (primary.has(e.data.target) && !primary.has(e.data.source)) oneHop.add(e.data.source);
+    });
+    [...oneHop]
+      .sort((a, b) => (degree[b] || 0) - (degree[a] || 0))
+      .forEach(id => { if (focusIds.size < FOCUS_CAP) focusIds.add(id); });
+  }
 
   // Strip compound parent nodes and the parent reference from child data so the
   // focus view renders as a clean flat graph without compound bounding boxes.

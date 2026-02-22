@@ -75,6 +75,26 @@ class FileVisitorTest extends TestCase
         $this->assertStringContainsString('dynamic', $edge->target);
     }
 
+    public function testEnterNode_WithPluginDirPath_ResolvesLabel(): void
+    {
+        // plugin_dir_path(__FILE__) is the most common WordPress include pattern.
+        // It must NOT produce a 'dynamic' label — the string literal suffix should
+        // be used as the resolved filename.
+        $this->visitor->setPluginRoot('/plugin');
+        $this->parse(
+            '<?php require_once plugin_dir_path( __FILE__ ) . \'includes/helpers.php\';',
+            '/plugin/plugin.php',
+        );
+
+        $nodes  = $this->collection->getAllNodes();
+        $labels = array_map(static fn ($n) => $n->label, array_values(
+            array_filter($nodes, static fn ($n) => $n->type === 'file')
+        ));
+
+        $this->assertNotContains('dynamic', $labels, 'plugin_dir_path(__FILE__) concat should resolve to a real filename');
+        $this->assertContains('helpers.php', $labels);
+    }
+
     public function testEnterNode_BothSourceAndTargetFileNodesExist(): void
     {
         $this->parse('<?php require "something.php";');

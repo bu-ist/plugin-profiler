@@ -117,6 +117,20 @@ class FileVisitor extends NamespaceAwareVisitor
             return $currentDir;
         }
 
+        // plugin_dir_path(__FILE__) — WordPress helper equivalent to
+        // trailingslashit(dirname(__FILE__)).  Returns directory with a
+        // trailing slash, so concatenated paths like
+        //   plugin_dir_path(__FILE__) . 'includes/foo.php'
+        // resolve correctly without a leading slash on the right operand.
+        if ($expr instanceof Expr\FuncCall
+            && $expr->name instanceof Node\Name
+            && $expr->name->toString() === 'plugin_dir_path'
+            && isset($expr->args[0])
+            && $expr->args[0]->value instanceof Node\Scalar\MagicConst\File
+        ) {
+            return $currentDir . '/';
+        }
+
         return null;
     }
 
