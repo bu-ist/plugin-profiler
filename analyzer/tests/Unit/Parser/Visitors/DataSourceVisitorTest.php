@@ -111,4 +111,45 @@ class DataSourceVisitorTest extends TestCase
         $writeEdges = array_filter($edges, static fn ($e) => $e->type === 'writes_data');
         $this->assertNotEmpty($writeEdges);
     }
+
+    // ── PDO detection ──────────────────────────────────────────────────────────
+
+    public function testEnterNode_WithPdoQuery_CreatesDatabaseReadNode(): void
+    {
+        $this->parse('<?php $pdo->query("SELECT 1");');
+
+        $nodes   = $this->collection->getAllNodes();
+        $dbNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'database' && $n->metadata['operation'] === 'read');
+        $this->assertNotEmpty($dbNodes, 'PDO query() should produce a database read node');
+    }
+
+    public function testEnterNode_WithPdoExec_CreatesDatabaseWriteNode(): void
+    {
+        $this->parse('<?php $myPdo->exec("DELETE FROM logs");');
+
+        $nodes   = $this->collection->getAllNodes();
+        $dbNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'database' && $n->metadata['operation'] === 'write');
+        $this->assertNotEmpty($dbNodes, 'PDO exec() should produce a database write node');
+    }
+
+    // ── MySQLi detection ───────────────────────────────────────────────────────
+
+    public function testEnterNode_WithMysqliQuery_CreatesDatabaseReadNode(): void
+    {
+        $this->parse('<?php $mysqli->query("SELECT 1");');
+
+        $nodes   = $this->collection->getAllNodes();
+        $dbNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'database' && $n->metadata['operation'] === 'read');
+        $this->assertNotEmpty($dbNodes, 'MySQLi query() should produce a database read node');
+    }
+
+    public function testEnterNode_WithUnrelatedVariableQuery_SkipsNode(): void
+    {
+        // A variable like $service->query() should NOT be detected — no pdo/mysqli in name
+        $this->parse('<?php $service->query("SELECT 1");');
+
+        $nodes   = $this->collection->getAllNodes();
+        $dbNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'database');
+        $this->assertEmpty($dbNodes, 'Variables unrelated to PDO/MySQLi should not produce database nodes');
+    }
 }

@@ -1,3 +1,13 @@
+/**
+ * Search and type-filter controls for the Plugin Profiler graph.
+ *
+ * Public entry point: initSearch(cy, allNodes).
+ * Wires the text search input, builds type-filter toggle buttons from the
+ * live node set, and binds keyboard shortcuts (/, F, Esc, 1–9).
+ */
+
+import { nodeBadge } from './constants.js';
+
 let _cy = null;
 let _activeTypes = new Set();
 let _allNodes = null;  // full node list (may exceed rendered set)
@@ -35,40 +45,9 @@ function buildTypeFilters(allTypes) {
 
   container.innerHTML = '';
 
-  const TYPE_COLORS = {
-    // PHP / WordPress
-    class:            'bg-blue-600',
-    interface:        'bg-blue-500',
-    trait:            'bg-blue-400',
-    function:         'bg-teal-600',
-    method:           'bg-teal-500',
-    hook:             'bg-orange-500',
-    rest_endpoint:    'bg-green-600',
-    ajax_handler:     'bg-green-500',
-    shortcode:        'bg-green-400',
-    admin_page:       'bg-green-700',
-    cron_job:         'bg-green-700',
-    post_type:        'bg-green-800',
-    taxonomy:         'bg-green-800',
-    data_source:      'bg-purple-500',
-    http_call:        'bg-red-500',
-    file:             'bg-gray-500',
-    // Gutenberg / WP JS
-    gutenberg_block:  'bg-pink-500',
-    js_hook:          'bg-orange-400',
-    js_api_call:      'bg-green-500',
-    js_function:      'bg-teal-500',
-    js_class:         'bg-blue-500',
-    // React / LAMP frontend
-    react_component:  'bg-cyan-500',
-    react_hook:       'bg-violet-500',
-    fetch_call:       'bg-rose-500',
-    axios_call:       'bg-rose-400',
-  };
-
   [...allTypes].sort().forEach((type, i) => {
     const btn = document.createElement('button');
-    const colorClass = TYPE_COLORS[type] || 'bg-gray-500';
+    const colorClass = nodeBadge(type);
     btn.className = `type-filter-btn px-2 py-0.5 rounded text-xs text-white font-medium ${colorClass} opacity-100 transition-opacity`;
     btn.textContent = type.replace(/_/g, ' ');
     btn.dataset.type = type;

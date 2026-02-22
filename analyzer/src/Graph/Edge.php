@@ -12,7 +12,8 @@ class Edge
         public readonly string $target,
         public readonly string $type,
         public readonly string $label,
-    ) {}
+    ) {
+    }
 
     public static function make(string $source, string $target, string $type, string $label): self
     {

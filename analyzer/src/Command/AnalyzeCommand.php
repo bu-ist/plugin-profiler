@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace PluginProfiler\Command;
 
 use DateTimeImmutable;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
 use PluginProfiler\Export\JsonExporter;
+use PluginProfiler\Graph\CrossReferenceResolver;
 use PluginProfiler\Graph\EntityCollection;
 use PluginProfiler\Graph\GraphBuilder;
 use PluginProfiler\Graph\PluginMetadata;
@@ -28,6 +24,11 @@ use PluginProfiler\Parser\Visitors\FunctionVisitor;
 use PluginProfiler\Parser\Visitors\HookVisitor;
 use PluginProfiler\Parser\Visitors\JavaScriptVisitor;
 use PluginProfiler\Scanner\FileScanner;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class AnalyzeCommand extends Command
 {
@@ -119,7 +120,11 @@ class AnalyzeCommand extends Command
         $totalEntities = count($collection->getAllNodes());
         $output->writeln(sprintf('  Discovered %d entities.', $totalEntities));
 
-        // Step 4: Build graph
+        // Step 4a: Cross-language edge resolution (JS → PHP)
+        // Runs before GraphBuilder so the new edges are validated alongside all others.
+        (new CrossReferenceResolver())->resolve($collection);
+
+        // Step 4b: Build graph
         $output->writeln('<comment>Building graph...</comment>');
         $meta = new PluginMetadata(
             name: $pluginMeta['name'] ?? basename($pluginPath),
@@ -147,26 +152,35 @@ class AnalyzeCommand extends Command
 
             $output->writeln(sprintf('<comment>Generating descriptions via %s (%s)...</comment>', $llmProvider, $llmModel));
 
+            $client = null;
             if ($llmProvider === 'ollama') {
                 $ollamaHost = (string) (getenv('OLLAMA_HOST') ?: 'http://ollama:11434');
-                $client     = new OllamaClient($ollamaHost, $llmModel, $timeout);
+                if (!$this->checkOllamaConnectivity($ollamaHost)) {
+                    $output->writeln(sprintf('<error>Ollama is not reachable at %s.</error>', $ollamaHost));
+                    $output->writeln('<comment>  → Start it: docker compose --profile llm up -d ollama</comment>');
+                    $output->writeln('<comment>  → Or skip descriptions: add --no-descriptions</comment>');
+                } else {
+                    $client = new OllamaClient($ollamaHost, $llmModel, $timeout);
+                }
             } elseif ($llmProvider === 'claude') {
                 $client = new ClaudeClient($apiKey, $llmModel, min($timeout, 60));
             } else {
                 $client = ApiClient::forProvider($llmProvider, $apiKey, $llmModel, min($timeout, 60));
             }
 
-            $totalNodes = count($graph->nodes);
-            $generator  = new DescriptionGenerator($client, $batchSize);
-            $generator->generate($graph, function (int $done, int $total) use ($output): void {
-                $output->write(sprintf(
-                    "\r  Describing entities: %d / %d",
-                    $done,
-                    $total,
-                ));
-            });
-            $output->writeln('');
-            $output->writeln(sprintf('  Done. %d entities described.', $totalNodes));
+            if ($client !== null) {
+                $totalNodes = count($graph->nodes);
+                $generator  = new DescriptionGenerator($client, $batchSize);
+                $generator->generate($graph, function (int $done, int $total) use ($output): void {
+                    $output->write(sprintf(
+                        "\r  Describing entities: %d / %d",
+                        $done,
+                        $total,
+                    ));
+                });
+                $output->writeln('');
+                $output->writeln(sprintf('  Done. %d entities described.', $totalNodes));
+            }
         }
 
         // Step 6: Export
@@ -181,6 +195,26 @@ class AnalyzeCommand extends Command
         ));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Test whether the Ollama HTTP server is accepting connections.
+     *
+     * Uses a 3-second timeout so a missing container doesn't stall the pipeline.
+     * The /api/tags endpoint is a lightweight, read-only Ollama route that lists
+     * installed models and returns HTTP 200 when the server is healthy.
+     */
+    private function checkOllamaConnectivity(string $ollamaHost): bool
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'GET',
+                'timeout'       => 3,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        return @file_get_contents($ollamaHost . '/api/tags', false, $context) !== false;
     }
 
     /**

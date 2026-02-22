@@ -22,7 +22,8 @@ abstract class NamespaceAwareVisitor extends NodeVisitorAbstract
 
     public function __construct(
         protected readonly EntityCollection $collection,
-    ) {}
+    ) {
+    }
 
     public function beforeTraverse(array $nodes): ?array
     {

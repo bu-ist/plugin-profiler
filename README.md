@@ -223,7 +223,7 @@ Clicking a node opens a panel showing:
 |---|---|
 | **Search box** | Filter nodes by label in real time |
 | **Type filter buttons** | Toggle visibility for each node type |
-| **Layout dropdown** | Switch between Dagre (hierarchy), CoSE (force), Breadth-first, Grid |
+| **Layout dropdown** | Switch between Dagre (hierarchy), fCoSE (force-directed), Breadth-first, Grid |
 | **+ / − / Fit** | Zoom controls |
 
 ### Keyboard shortcuts
@@ -262,6 +262,8 @@ Clicking a node opens a panel showing:
 | `file` | Rectangle | Gray | PHP file (via `include`/`require`) |
 | `gutenberg_block` | Rounded rectangle | Pink | `block.json` / `registerBlockType` |
 | `js_api_call` | Ellipse | Green | `apiFetch` REST call |
+| `namespace` | Rounded rectangle | Slate (group) | PHP namespace compound group |
+| `dir` | Rounded rectangle | Dark slate (group) | JS directory compound group |
 
 ---
 
@@ -280,6 +282,11 @@ Clicking a node opens a panel showing:
 | `includes` | Default | File include/require |
 | `renders_block` | Dotted pink | Gutenberg block → PHP render template |
 | `enqueues_script` | Dotted pink | Gutenberg block → JS asset |
+| `uses_trait` | Dashed blue | Class uses a PHP trait |
+| `instantiates` | Dotted teal | Function/method creates a `new ClassName()` |
+| `calls_endpoint` | Solid pink | JS `apiFetch` / `fetch` → PHP REST endpoint |
+| `calls_ajax_handler` | Dashed pink | JS `fetch` to `admin-ajax.php` → PHP AJAX handler |
+| `js_block_matches_php` | Dotted pink | JS block registration → PHP block definition |
 
 ---
 
@@ -340,22 +347,23 @@ Host machine
 1. **FileScanner** — Discovers `.php`, `.js`, `.jsx`, `.ts`, `.tsx`, `block.json` files. Skips `vendor/`, `node_modules/`, `.git/`.
 2. **PluginParser** — Runs the AST visitors on each file type.
 3. **Visitors** (PHP via nikic/php-parser v5, JS via mck89/peast):
-   - `ClassVisitor` — classes, interfaces, traits, inheritance
-   - `FunctionVisitor` — functions and methods
+   - `ClassVisitor` — classes, interfaces, traits, inheritance, trait-usage edges
+   - `FunctionVisitor` — functions, methods, class-instantiation edges
    - `HookVisitor` — `add_action`, `add_filter`, `do_action`, `apply_filters`
    - `DataSourceVisitor` — Options API, post/user meta, transients, `$wpdb`
    - `ExternalInterfaceVisitor` — REST, AJAX, shortcodes, admin pages, cron, post types, taxonomies, HTTP
    - `FileVisitor` — `include` / `require` relationships
    - `JavaScriptVisitor` — `registerBlockType`, `addAction`, `addFilter`, `apiFetch`
    - `BlockJsonVisitor` — `block.json` blocks
-4. **GraphBuilder** — Resolves cross-references, drops edges to missing nodes.
-5. **DescriptionGenerator** (optional) — Batches entities to LLM, attaches descriptions.
-6. **JsonExporter** — Writes Cytoscape.js-compatible `graph-data.json`.
+4. **CrossReferenceResolver** — Connects JS calls to their PHP handlers: `apiFetch` → REST endpoint, `admin-ajax.php` fetches → AJAX handler, Gutenberg block JS ↔ PHP definition.
+5. **GraphBuilder** — Resolves cross-references, drops edges to missing nodes.
+6. **DescriptionGenerator** (optional) — Batches entities to LLM, attaches descriptions.
+7. **JsonExporter** — Writes Cytoscape.js-compatible `graph-data.json`.
 
 ### Frontend
 
 Vanilla JavaScript — no build step. Loaded via CDN:
-- [Cytoscape.js](https://js.cytoscape.org) + [cytoscape-dagre](https://github.com/cytoscape/cytoscape.js-dagre)
+- [Cytoscape.js](https://js.cytoscape.org) + [cytoscape-dagre](https://github.com/cytoscape/cytoscape.js-dagre) + [cytoscape-fcose](https://github.com/iVis-at-Bilkent/cytoscape.js-fcose)
 - [Tailwind CSS](https://tailwindcss.com)
 - [Prism.js](https://prismjs.com) (syntax highlighting)
 
@@ -368,7 +376,7 @@ Vanilla JavaScript — no build step. Loaded via CDN:
 All tests require Docker (local PHP is likely not 8.1):
 
 ```bash
-# Build the test image and run all 139 tests
+# Build the test image and run all 191 tests
 docker build --target test -t plugin-profiler-test ./analyzer
 docker run --rm plugin-profiler-test
 ```
@@ -421,6 +429,7 @@ plugin-profiler/
 │   ├── index.html
 │   ├── js/
 │   │   ├── app.js               # Entry: fetch data, init graph
+│   │   ├── constants.js         # Node/edge type metadata (colors, shapes, badges)
 │   │   ├── graph.js             # Cytoscape config + node/edge styles
 │   │   ├── sidebar.js           # Inspector panel
 │   │   ├── search.js            # Search + type filter toggles
@@ -533,7 +542,7 @@ This repository ships a GitHub Actions workflow (`.github/workflows/ci.yml`) wit
 
 | Job | What it checks |
 |---|---|
-| **PHP Tests** | Runs all 139 PHPUnit tests on PHP 8.1; checks PSR-12 style with php-cs-fixer |
+| **PHP Tests** | Runs all 191 PHPUnit tests on PHP 8.1; checks PSR-12 style with php-cs-fixer |
 | **Docker Build** | Confirms both `analyzer` and `web` images build cleanly |
 | **JS Lint** | Runs ESLint on `web/js/` |
 

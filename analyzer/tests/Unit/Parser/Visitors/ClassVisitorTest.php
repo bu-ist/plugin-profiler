@@ -121,4 +121,33 @@ class ClassVisitorTest extends TestCase
         $this->assertContains('Bar', $node?->metadata['implements'] ?? []);
         $this->assertContains('Baz', $node?->metadata['implements'] ?? []);
     }
+
+    public function testEnterNode_WithTraitUse_CreatesUsesTraitEdge(): void
+    {
+        $this->parse('<?php trait Loggable {} class Service { use Loggable; }');
+
+        $edges        = $this->collection->getAllEdges();
+        $traitEdges   = array_filter($edges, static fn ($e) => $e->type === 'uses_trait');
+
+        $this->assertCount(1, $traitEdges, 'Expected exactly one uses_trait edge');
+
+        $edge = reset($traitEdges);
+        $this->assertSame('class_Service', $edge->source);
+        $this->assertSame('class_Loggable', $edge->target);
+        $this->assertSame('uses trait', $edge->label);
+    }
+
+    public function testEnterNode_WithMultipleTraits_CreatesEdgeForEach(): void
+    {
+        $this->parse('<?php trait A {} trait B {} class MyClass { use A, B; }');
+
+        $edges      = $this->collection->getAllEdges();
+        $traitEdges = array_filter($edges, static fn ($e) => $e->type === 'uses_trait');
+
+        $this->assertCount(2, $traitEdges, 'One uses_trait edge expected per trait');
+
+        $targets = array_map(static fn ($e) => $e->target, $traitEdges);
+        $this->assertContains('class_A', $targets);
+        $this->assertContains('class_B', $targets);
+    }
 }

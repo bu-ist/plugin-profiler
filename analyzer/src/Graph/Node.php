@@ -18,7 +18,8 @@ class Node
         public readonly int $line,
         public readonly array $metadata,
         public readonly ?string $docblock = null,
-    ) {}
+    ) {
+    }
 
     public static function make(
         string $id,

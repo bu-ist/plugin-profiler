@@ -111,6 +111,25 @@ async function main() {
     (_nodeData) => {},
   );
 
+  // Initialize the expand-collapse extension so the collapse button can retrieve
+  // the API handle via cy.expandCollapse('get'). layoutBy re-runs fCoSE after
+  // every group expansion or collapse, keeping the graph tidy without a full
+  // manual re-layout. 'draft' quality is intentionally chosen here for speed —
+  // the user just interacted and wants an immediate response.
+  cy.expandCollapse({
+    layoutBy: {
+      name:              'fcose',
+      animate:           true,
+      animationDuration: 300,
+      quality:           'draft',
+      randomize:         false,
+    },
+    undoable:          false,
+    fisheye:           false,
+    animate:           true,
+    animationDuration: 300,
+  });
+
   // Search operates on ALL nodes (not just rendered), so pass full graphData
   initSidebar(cy);
   initSearch(cy, graphData.nodes || []);
@@ -129,6 +148,24 @@ async function main() {
   }
 
   applyLayout(cy, autoLayout);
+
+  // Collapse/Expand toggle — requires the expand-collapse extension to be
+  // initialised. The extension is registered in graph.js; the API is available
+  // via cy.expandCollapse('get') after the first call to cy.expandCollapse({}).
+  document.getElementById('collapse-btn')?.addEventListener('click', () => {
+    const api      = cy.expandCollapse('get');
+    const hasGroups = cy.nodes('[type = "namespace"], [type = "dir"]').length > 0;
+    if (!api || !hasGroups) return;
+
+    const anyCollapsed = cy.nodes(':parent').some((n) => api.isCollapsed(n));
+    if (anyCollapsed) {
+      api.expandAll();
+      document.getElementById('collapse-btn').textContent = '⊟ Groups';
+    } else {
+      api.collapseAll();
+      document.getElementById('collapse-btn').textContent = '⊞ Groups';
+    }
+  });
 
   // Zoom controls — zoom toward the center of the viewport
   const zoomCenter = () => {

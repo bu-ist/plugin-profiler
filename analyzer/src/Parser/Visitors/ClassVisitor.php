@@ -70,6 +70,21 @@ class ClassVisitor extends NamespaceAwareVisitor
                 Edge::make($id, $interfaceId, 'implements', 'implements')
             );
         }
+
+        // Trait usage edges — each `use TraitName;` statement inside the class body
+        // creates a uses_trait edge. We use the short name + current namespace to match
+        // the ID scheme used in handleTrait(). Cross-namespace traits that cannot be
+        // resolved here will simply produce dangling edges that GraphBuilder drops silently.
+        foreach ($node->stmts as $stmt) {
+            if ($stmt instanceof Stmt\TraitUse) {
+                foreach ($stmt->traits as $traitName) {
+                    $traitId = $this->classId($traitName->getLast());
+                    $this->collection->addEdge(
+                        Edge::make($id, $traitId, 'uses_trait', 'uses trait')
+                    );
+                }
+            }
+        }
     }
 
     private function handleInterface(Stmt\Interface_ $node): void

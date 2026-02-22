@@ -12,7 +12,8 @@ class DescriptionGenerator
     public function __construct(
         private readonly LLMClientInterface $client,
         private readonly int $batchSize = 25,
-    ) {}
+    ) {
+    }
 
     /**
      * Attach AI-generated descriptions to all nodes in the graph (in-place).
@@ -67,15 +68,33 @@ class DescriptionGenerator
 
         // Add relevant metadata fields
         $meta = $node->metadata;
-        if (!empty($meta['namespace']))  $payload['namespace']  = $meta['namespace'];
-        if (!empty($meta['extends']))    $payload['extends']    = $meta['extends'];
-        if (!empty($meta['implements'])) $payload['implements'] = $meta['implements'];
-        if (!empty($meta['hook_name']))  $payload['hook_name']  = $meta['hook_name'];
-        if (!empty($meta['http_method'])) $payload['http_method'] = $meta['http_method'];
-        if (!empty($meta['route']))      $payload['route']      = $meta['route'];
-        if (!empty($meta['operation']))  $payload['operation']  = $meta['operation'];
-        if (!empty($meta['key']))        $payload['key']        = $meta['key'];
-        if (!empty($meta['block_name'])) $payload['block_name'] = $meta['block_name'];
+        if (!empty($meta['namespace'])) {
+            $payload['namespace']  = $meta['namespace'];
+        }
+        if (!empty($meta['extends'])) {
+            $payload['extends']    = $meta['extends'];
+        }
+        if (!empty($meta['implements'])) {
+            $payload['implements'] = $meta['implements'];
+        }
+        if (!empty($meta['hook_name'])) {
+            $payload['hook_name']  = $meta['hook_name'];
+        }
+        if (!empty($meta['http_method'])) {
+            $payload['http_method'] = $meta['http_method'];
+        }
+        if (!empty($meta['route'])) {
+            $payload['route']      = $meta['route'];
+        }
+        if (!empty($meta['operation'])) {
+            $payload['operation']  = $meta['operation'];
+        }
+        if (!empty($meta['key'])) {
+            $payload['key']        = $meta['key'];
+        }
+        if (!empty($meta['block_name'])) {
+            $payload['block_name'] = $meta['block_name'];
+        }
 
         // Add connected node labels as context
         $connectedIds = [];

@@ -1,28 +1,12 @@
-const TYPE_BADGE_CLASSES = {
-  class:           'bg-blue-500',
-  interface:       'bg-blue-400',
-  trait:           'bg-blue-300 text-gray-800',
-  function:        'bg-teal-500',
-  method:          'bg-teal-400',
-  hook:            'bg-orange-500',
-  js_hook:         'bg-orange-400',
-  rest_endpoint:   'bg-green-500',
-  ajax_handler:    'bg-green-400',
-  shortcode:       'bg-green-300 text-gray-800',
-  admin_page:      'bg-green-600',
-  cron_job:        'bg-green-700',
-  post_type:       'bg-green-800',
-  taxonomy:        'bg-green-800',
-  data_source:     'bg-purple-500',
-  http_call:       'bg-red-500',
-  file:            'bg-gray-500',
-  gutenberg_block: 'bg-pink-500',
-  js_api_call:     'bg-green-500',
-  js_function:     'bg-teal-500',
-  js_class:        'bg-blue-500',
-};
+import { nodeBadge } from './constants.js';
 
-const JS_TYPES = new Set(['js_hook', 'js_api_call', 'js_function', 'js_class', 'gutenberg_block']);
+// All node types that originate from JavaScript files — these get JS syntax
+// highlighting in the source preview block instead of PHP highlighting.
+const JS_TYPES = new Set([
+  'js_hook', 'js_api_call', 'js_function', 'js_class',
+  'gutenberg_block', 'react_component', 'react_hook',
+  'fetch_call', 'axios_call',
+]);
 
 let _cy = null;
 
@@ -67,8 +51,52 @@ export function closeSidebar() {
   sidebar.classList.remove('flex');
 }
 
+/**
+ * Render a compact sidebar for compound group nodes (namespace / directory).
+ * These nodes carry no file, line, or source_preview — only a label and type.
+ * We derive a member list from the live Cytoscape graph when available.
+ */
+function buildGroupSidebarHtml(data) {
+  const badgeClass = nodeBadge(data.type);
+  const icon       = data.type === 'namespace' ? '⬡' : '⊞';
+
+  // Members are visible children of the compound node. When the group is
+  // collapsed the expand-collapse extension hides them, so we get zero — the
+  // "expand to view members" hint below handles that case gracefully.
+  const children   = _cy ? _cy.getElementById(data.id).children() : null;
+  const count      = children ? children.length : 0;
+
+  const childItems = count > 0
+    ? children.map((c) =>
+        `<li><button class="text-blue-400 hover:underline text-xs text-left" data-node-id="${escapeHtml(c.id())}">${escapeHtml(c.data('label'))}</button></li>`
+      ).join('')
+    : '<li class="text-gray-500 text-xs italic">Expand the group to view members.</li>';
+
+  return `
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="shrink-0 px-2 py-0.5 rounded text-xs font-semibold text-white ${badgeClass}">${escapeHtml(data.type)}</span>
+        <span class="font-semibold text-white truncate" title="${escapeHtml(data.label)}">${icon} ${escapeHtml(data.label)}</span>
+      </div>
+      <button id="sidebar-close" class="text-gray-400 hover:text-white shrink-0 ml-2" aria-label="Close">&#x2715;</button>
+    </div>
+
+    <div class="mt-2 mb-3">
+      <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">
+        Members${count > 0 ? ` (${count})` : ''}
+      </div>
+      <ul class="list-none space-y-0.5 pl-2">${childItems}</ul>
+    </div>
+  `;
+}
+
 function buildSidebarHtml(data) {
-  const badgeClass = TYPE_BADGE_CLASSES[data.type] || 'bg-gray-500';
+  // Compound namespace / directory groups get a minimal dedicated view.
+  if (data.type === 'namespace' || data.type === 'dir') {
+    return buildGroupSidebarHtml(data);
+  }
+
+  const badgeClass = nodeBadge(data.type);
   const subtype = data.subtype ? ` / ${data.subtype}` : '';
   const language = JS_TYPES.has(data.type) ? 'javascript' : 'php';
 
@@ -92,8 +120,13 @@ function buildSidebarHtml(data) {
     </div>
 
     ${data.description
-      ? `<p class="text-sm text-gray-300 mb-3">${escapeHtml(data.description)}</p>`
-      : '<p class="text-xs text-gray-500 italic mb-3">No AI description generated.</p>'}
+      ? `<div class="mb-3 rounded-lg border border-indigo-800/40 bg-indigo-950/50 p-3">
+           <div class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-indigo-400">
+             <span aria-hidden="true">✦</span><span>AI Insight</span>
+           </div>
+           <p class="text-sm leading-relaxed text-slate-200">${escapeHtml(data.description)}</p>
+         </div>`
+      : '<p class="text-xs text-gray-500 italic mb-3">No AI description — run without <code class="text-gray-400">--no-descriptions</code> to generate.</p>'}
 
     <div class="text-xs text-gray-400 mb-3">
       <span class="text-gray-500">File:</span>

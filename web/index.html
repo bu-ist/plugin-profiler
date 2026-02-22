@@ -13,13 +13,20 @@
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-php.min.js" defer></script>
 
-  <!-- Cytoscape.js + dagre layout -->
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+  <!-- Cytoscape.js + layout plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js"></script>
+  <!-- dagre: hierarchical layout for directed graphs -->
   <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <!-- fCoSE: fast compound spring embedder — best default for mixed plugin graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.min.js"></script>
+  <!-- expand-collapse: collapse/expand compound namespace and directory groups -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-expand-collapse@4.1.1/cytoscape-expand-collapse.js"></script>
   <script>
-    // Make dagre available for graph.js
-    window.cytoscapeDagre = cytoscapeDagre;
+    // Expose layout plugins to graph.js (loaded as ES module, no access to globals otherwise)
+    window.cytoscapeDagre          = cytoscapeDagre;
+    window.cytoscapeFcose          = cytoscapeFcose;
+    window.cytoscapeExpandCollapse = cytoscapeExpandCollapse;
   </script>
 
   <style>
@@ -74,11 +81,14 @@
         id="layout-select"
         class="bg-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
       >
-        <option value="dagre" selected>Dagre (hierarchy)</option>
-        <option value="cose">CoSE (force)</option>
+        <option value="dagre">Dagre (hierarchy)</option>
+        <option value="fcose" selected>fCoSE (force)</option>
         <option value="breadthfirst">Breadth-first</option>
         <option value="grid">Grid</option>
       </select>
+
+      <!-- Collapse/Expand all namespace groups -->
+      <button id="collapse-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Collapse / Expand all groups">⊟ Groups</button>
 
       <!-- Zoom controls -->
       <button id="zoom-in"  class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom In">+</button>

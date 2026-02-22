@@ -8,6 +8,9 @@ services:
       - ${PLUGIN_PATH:-./sample-plugin}:/plugin:ro
       - output:/output
     environment:
+      # LLM_PROVIDER defaults to ollama. The ollama container only starts with
+      # --profile llm; the analyzer will print a clear error if it is unreachable.
+      # Switch to claude / openai / gemini and set LLM_API_KEY for external APIs.
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder:7b}
       - LLM_API_KEY=${LLM_API_KEY:-}
@@ -25,6 +28,10 @@ services:
     volumes:
       - output:/usr/share/nginx/html/data:ro
 
+  # Ollama only starts when you explicitly request the llm profile:
+  #   docker compose --profile llm up -d ollama
+  # Pre-pull the model before first use to avoid timeout during analysis:
+  #   docker compose --profile llm run --rm ollama ollama pull qwen2.5-coder:7b
   ollama:
     image: ollama/ollama
     volumes:

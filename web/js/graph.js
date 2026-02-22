@@ -1,168 +1,193 @@
-import { LAYOUTS } from './layouts.js';
+/**
+ * graph.js — Cytoscape initialisation, node/edge styling, and interaction.
+ *
+ * Node type metadata (colours, shapes) is imported from constants.js — the
+ * single source of truth shared by graph.js, sidebar.js, and search.js.
+ * Adding a new node type requires editing only constants.js.
+ *
+ * EDGE_STYLES remains here because edge rendering logic is Cytoscape-specific
+ * and not consumed by other modules.
+ */
 
-const NODE_COLORS = {
-  // PHP / WordPress
-  class:            '#3B82F6',
-  interface:        '#3B82F6',
-  trait:            '#3B82F6',
-  function:         '#14B8A6',
-  method:           '#14B8A6',
-  hook:             '#F97316',
-  rest_endpoint:    '#22C55E',
-  ajax_handler:     '#22C55E',
-  shortcode:        '#22C55E',
-  admin_page:       '#22C55E',
-  cron_job:         '#22C55E',
-  post_type:        '#22C55E',
-  taxonomy:         '#22C55E',
-  data_source:      '#A855F7',
-  http_call:        '#EF4444',
-  file:             '#6B7280',
-  // Gutenberg / WP JS
-  gutenberg_block:  '#EC4899',
-  js_hook:          '#F97316',
-  js_api_call:      '#22C55E',
-  js_function:      '#14B8A6',
-  js_class:         '#3B82F6',
-  // React / LAMP frontend
-  react_component:  '#06B6D4',   // cyan — clearly distinct from PHP class blue
-  react_hook:       '#8B5CF6',   // violet
-  fetch_call:       '#F43F5E',   // rose-red — HTTP calls from frontend
-  axios_call:       '#F43F5E',   // rose-red — same family as fetch
-};
+import { LAYOUTS }    from './layouts.js';
+import { NODE_TYPES } from './constants.js';
 
-const NODE_SHAPES = {
-  // PHP / WordPress
-  class:            'round-rectangle',
-  interface:        'round-rectangle',
-  trait:            'round-rectangle',
-  function:         'roundrectangle',
-  method:           'roundrectangle',
-  hook:             'diamond',
-  rest_endpoint:    'hexagon',
-  ajax_handler:     'hexagon',
-  shortcode:        'tag',
-  admin_page:       'rectangle',
-  cron_job:         'ellipse',
-  post_type:        'barrel',
-  taxonomy:         'barrel',
-  data_source:      'barrel',
-  http_call:        'ellipse',
-  file:             'rectangle',
-  // Gutenberg / WP JS
-  gutenberg_block:  'round-rectangle',
-  js_hook:          'diamond',
-  js_api_call:      'ellipse',
-  js_function:      'roundrectangle',
-  js_class:         'round-rectangle',
-  // React / LAMP frontend
-  react_component:  'round-rectangle',
-  react_hook:       'diamond',
-  fetch_call:       'ellipse',
-  axios_call:       'ellipse',
-};
+// ── Edge styles ───────────────────────────────────────────────────────────────
+// Each entry maps to a Cytoscape style rule below. Structure:
+//   selector string → { partial style overrides }
+
+const EDGE_STYLES = [
+  // Inheritance — solid blue
+  {
+    selector: 'edge[type="extends"], edge[type="implements"], edge[type="uses_trait"]',
+    style:    { 'line-style': 'solid', 'width': 2, 'line-color': '#3B82F6', 'target-arrow-color': '#3B82F6' },
+  },
+  // Instantiation — dotted teal (weaker dependency than inheritance)
+  {
+    selector: 'edge[type="instantiates"]',
+    style:    { 'line-style': 'dotted', 'width': 1.5, 'line-color': '#14B8A6', 'target-arrow-color': '#14B8A6' },
+  },
+  // WordPress hooks — dashed orange
+  {
+    selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',
+    style:    { 'line-style': 'dashed', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+  },
+  // Hook trigger to handler — solid orange
+  {
+    selector: 'edge[type="triggers_handler"]',
+    style:    { 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+  },
+  // Data reads — solid purple
+  {
+    selector: 'edge[type="reads_data"]',
+    style:    { 'width': 2.5, 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
+  },
+  // Data writes — dashed purple (writes are "heavier" than reads)
+  {
+    selector: 'edge[type="writes_data"]',
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
+  },
+  // Outbound HTTP — red
+  {
+    selector: 'edge[type="http_request"]',
+    style:    { 'line-color': '#EF4444', 'target-arrow-color': '#EF4444' },
+  },
+  // Block rendering and asset enqueueing — dotted pink
+  {
+    selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
+    style:    { 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+  },
+  // Registration edges — dashed green
+  {
+    selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
+    style:    { 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
+  },
+  // Cross-language JS→PHP edges — solid/dashed pink (the tool's unique signal)
+  {
+    selector: 'edge[type="calls_endpoint"]',
+    style:    { 'width': 2, 'line-style': 'solid', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+  },
+  {
+    selector: 'edge[type="calls_ajax_handler"]',
+    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+  },
+  {
+    selector: 'edge[type="js_block_matches_php"]',
+    style:    { 'width': 1.5, 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+  },
+];
+
+// ── Stylesheet builder ────────────────────────────────────────────────────────
 
 function buildStylesheet() {
-  const typeSelectors = Object.entries(NODE_COLORS).map(([type, color]) => ({
+  // One rule per node type — colour and shape are driven entirely by NODE_TYPES
+  // in constants.js, so adding a new type here costs zero lines in this file.
+  const typeRules = Object.entries(NODE_TYPES).map(([type, meta]) => ({
     selector: `node[type="${type}"]`,
     style: {
-      'background-color': color,
-      'shape': NODE_SHAPES[type] || 'ellipse',
+      'background-color': meta.color,
+      'shape':            meta.shape,
     },
   }));
 
   return [
+    // ── Base node ─────────────────────────────────────────────────────────
     {
       selector: 'node',
       style: {
-        'label': 'data(label)',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'color': '#fff',
-        'font-size': '13px',
-        'font-family': 'ui-monospace, monospace',
-        'text-wrap': 'wrap',
-        'text-max-width': '160px',
-        'width': 'label',
-        'height': 'label',
-        'padding': '14px',
-        'border-width': 2,
-        'border-color': 'rgba(255,255,255,0.25)',
-        'background-color': '#6B7280',
-        'transition-property': 'background-color, border-color, opacity',
-        'transition-duration': '150ms',
+        'label':             'data(label)',
+        'text-valign':       'center',
+        'text-halign':       'center',
+        'color':             '#fff',
+        'font-size':         '13px',
+        'font-family':       'ui-monospace, monospace',
+        'text-wrap':         'wrap',
+        'text-max-width':    '160px',
+        'width':             'label',
+        'height':            'label',
+        'padding':           '14px',
+        'border-width':      2,
+        'border-color':      'rgba(255,255,255,0.25)',
+        'background-color':  '#6B7280',
+        'transition-property':  'background-color, border-color, opacity',
+        'transition-duration':  '150ms',
       },
     },
+    // ── Interface: dashed border signals "abstract contract" ─────────────
     {
       selector: 'node[type="interface"]',
       style: { 'border-style': 'dashed' },
     },
+    // ── Trait: dotted border signals "mixin / partial" ───────────────────
     {
       selector: 'node[type="trait"]',
       style: { 'border-style': 'dotted' },
     },
-    ...typeSelectors,
+    // ── Per-type colour + shape ───────────────────────────────────────────
+    ...typeRules,
+    // ── Compound namespace groups (PHP) ───────────────────────────────────
+    {
+      selector: 'node[type="namespace"]',
+      style: {
+        'background-color':  '#1E293B',
+        'border-color':      '#334155',
+        'border-width':      1,
+        'label':             'data(label)',
+        'text-valign':       'top',
+        'text-halign':       'center',
+        'font-size':         '11px',
+        'font-family':       'ui-monospace, monospace',
+        'color':             '#94A3B8',
+        'padding':           '20px',
+        'shape':             'round-rectangle',
+      },
+    },
+    // ── Compound directory groups (JS) ────────────────────────────────────
+    {
+      selector: 'node[type="dir"]',
+      style: {
+        'background-color':  '#0F172A',
+        'border-color':      '#1E293B',
+        'border-width':      1,
+        'label':             'data(label)',
+        'text-valign':       'top',
+        'font-size':         '10px',
+        'font-family':       'ui-monospace, monospace',
+        'color':             '#64748B',
+        'padding':           '16px',
+        'shape':             'round-rectangle',
+      },
+    },
+    // ── Base edge ─────────────────────────────────────────────────────────
     {
       selector: 'edge',
       style: {
-        'width': 1.5,
-        'line-color': '#475569',
-        'target-arrow-color': '#475569',
-        'target-arrow-shape': 'triangle',
-        'curve-style': 'bezier',
-        // Edge labels hidden by default — too noisy at normal zoom.
-        // They appear when an edge is selected (see node:selected rule below).
-        'label': '',
-        'font-size': '10px',
-        'color': '#94A3B8',
-        'text-rotation': 'autorotate',
-        'text-margin-y': '-8px',
-        'text-background-color': '#1e293b',
+        'width':                   1.5,
+        'line-color':              '#475569',
+        'target-arrow-color':      '#475569',
+        'target-arrow-shape':      'triangle',
+        'curve-style':             'bezier',
+        // Edge labels are hidden by default — they create visual noise at
+        // normal zoom. They become visible when an edge is selected.
+        'label':                   '',
+        'font-size':               '10px',
+        'color':                   '#94A3B8',
+        'text-rotation':           'autorotate',
+        'text-margin-y':           '-8px',
+        'text-background-color':   '#1e293b',
         'text-background-opacity': 0.85,
         'text-background-padding': '3px',
-        'text-background-shape': 'roundrectangle',
+        'text-background-shape':   'roundrectangle',
       },
     },
+    // ── Edge selected: reveal label, thicken stroke ───────────────────────
     {
-      // Show label when an edge is selected
       selector: 'edge:selected',
-      style: {
-        'label': 'data(label)',
-        'width': 2.5,
-      },
+      style: { 'label': 'data(label)', 'width': 2.5 },
     },
-    {
-      selector: 'edge[type="extends"], edge[type="implements"]',
-      style: { 'line-style': 'solid', 'width': 2, 'line-color': '#3B82F6', 'target-arrow-color': '#3B82F6' },
-    },
-    {
-      selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',
-      style: { 'line-style': 'dashed', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
-    },
-    {
-      selector: 'edge[type="reads_data"]',
-      style: { 'width': 2.5, 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
-    },
-    {
-      selector: 'edge[type="writes_data"]',
-      style: { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
-    },
-    {
-      selector: 'edge[type="http_request"]',
-      style: { 'line-color': '#EF4444', 'target-arrow-color': '#EF4444' },
-    },
-    {
-      selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
-      style: { 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
-    },
-    {
-      selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
-      style: { 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
-    },
-    {
-      selector: 'edge[type="triggers_handler"]',
-      style: { 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
-    },
+    // ── Per-type edge styles ──────────────────────────────────────────────
+    ...EDGE_STYLES,
+    // ── Dim non-focused elements during hover ─────────────────────────────
     {
       selector: 'node.dimmed',
       style: { 'opacity': 0.15 },
@@ -171,12 +196,10 @@ function buildStylesheet() {
       selector: 'edge.dimmed',
       style: { 'opacity': 0.05 },
     },
+    // ── Selection / highlight ring ────────────────────────────────────────
     {
       selector: 'node:selected',
-      style: {
-        'border-width': 3,
-        'border-color': '#FBBF24',
-      },
+      style: { 'border-width': 3, 'border-color': '#FBBF24' },
     },
     {
       selector: 'node.highlighted',
@@ -185,26 +208,53 @@ function buildStylesheet() {
   ];
 }
 
+// ── Cytoscape initialisation ──────────────────────────────────────────────────
+
+/**
+ * Create and return a configured Cytoscape instance.
+ *
+ * The WebGL renderer is enabled for graphs with >500 elements, where it
+ * delivers a dramatic FPS improvement (20 FPS → 100+ FPS on M-series Macs
+ * per Cytoscape.js Jan 2025 benchmarks). It supports bezier edges and all
+ * node styles used here. Falls back to canvas transparently if unavailable.
+ *
+ * @param {HTMLElement}   container          - The #cy DOM element.
+ * @param {Array}         elements           - Cytoscape elements array.
+ * @param {Function}      onNodeClick        - Called with node data on tap.
+ * @param {Function}      onNodeHover        - Called with (data, pos) on mouseover.
+ * @param {Function}      onNodeDoubleClick  - Called with node data on double-tap.
+ * @returns {cytoscape.Core}
+ */
 export function initCytoscape(container, elements, onNodeClick, onNodeHover, onNodeDoubleClick) {
-  // Register dagre layout if available
-  if (window.cytoscapeDagre) {
-    cytoscape.use(window.cytoscapeDagre);
-  }
+  // Register layout plugins (idempotent — safe to call multiple times)
+  if (window.cytoscapeDagre)          cytoscape.use(window.cytoscapeDagre);
+  if (window.cytoscapeFcose)          cytoscape.use(window.cytoscapeFcose);
+  if (window.cytoscapeExpandCollapse) cytoscape.use(window.cytoscapeExpandCollapse);
+
+  // Use WebGL renderer for graphs above the threshold where canvas starts
+  // dropping frames. Both renderers produce identical visual output.
+  const useWebGL   = elements.length > 500;
+  const rendererOpts = useWebGL ? { renderer: { name: 'canvas', webgl: true } } : {};
 
   const cy = cytoscape({
     container,
     elements,
-    style: buildStylesheet(),
-    layout: { name: 'preset' },  // app.js applies the auto-selected layout after init
-    minZoom: 0.05,
-    maxZoom: 4,
+    style:           buildStylesheet(),
+    layout:          { name: 'preset' },  // app.js applies the auto-selected layout after init
+    minZoom:         0.05,
+    maxZoom:         4,
     wheelSensitivity: 0.3,
+    ...rendererOpts,
   });
 
+  // ── Interaction handlers ─────────────────────────────────────────────────
+
+  // Single tap: open sidebar
   cy.on('tap', 'node', (evt) => {
     onNodeClick(evt.target.data());
   });
 
+  // Hover: dim everything except the hovered node + its 1-hop neighbourhood
   cy.on('mouseover', 'node', (evt) => {
     const node = evt.target;
     cy.elements().addClass('dimmed');
@@ -219,13 +269,14 @@ export function initCytoscape(container, elements, onNodeClick, onNodeHover, onN
     onNodeHover(null, null);
   });
 
+  // Double-tap: zoom into the node's neighbourhood
   cy.on('dbltap', 'node', (evt) => {
     const node = evt.target;
-    const neighborhood = node.closedNeighborhood();
-    cy.fit(neighborhood, 60);
+    cy.fit(node.closedNeighborhood(), 60);
     onNodeDoubleClick(node.data());
   });
 
+  // Click on canvas background: clear all highlights
   cy.on('tap', (evt) => {
     if (evt.target === cy) {
       cy.elements().removeClass('dimmed highlighted');

@@ -8,11 +8,19 @@ use PluginProfiler\Graph\Edge;
 use PluginProfiler\Graph\EntityCollection;
 use PluginProfiler\Graph\Node as GraphNode;
 
+/**
+ * Parses Gutenberg block.json files into graph nodes and edges.
+ *
+ * Creates a `gutenberg_block` node for each valid block.json, then adds
+ * `renders_block` edges to PHP render templates and `enqueues_script` edges
+ * to JS assets declared in `editorScript`, `script`, and `viewScript` fields.
+ */
 class BlockJsonVisitor
 {
     public function __construct(
         private readonly EntityCollection $collection,
-    ) {}
+    ) {
+    }
 
     /**
      * Parse a block.json file and add the block node plus relationship edges to the collection.

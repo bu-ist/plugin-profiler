@@ -33,7 +33,8 @@ PROMPT;
         private readonly string $apiKey,
         private readonly string $model = 'claude-haiku-4-5-20251001',
         private readonly int $timeout = 60,
-    ) {}
+    ) {
+    }
 
     public function generateDescriptions(array $entityBatch): array
     {

@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace PluginProfiler\LLM;
 
+/**
+ * OpenAI-compatible API client for external LLM providers (OpenAI, Gemini, etc.).
+ *
+ * Any provider that speaks the OpenAI chat completions format is supported via
+ * PROVIDER_BASE_URLS. Note that Claude is handled separately by ClaudeClient —
+ * AnalyzeCommand routes the `claude` provider there instead of here.
+ *
+ * Retries once automatically on network failure or malformed JSON.
+ */
 class ApiClient implements LLMClientInterface
 {
     private const SYSTEM_PROMPT = <<<'PROMPT'
@@ -23,9 +32,9 @@ Respond with a JSON object mapping entity IDs to descriptions.
 PROMPT;
 
     private const PROVIDER_BASE_URLS = [
-        'gemini'   => 'https://generativelanguage.googleapis.com/v1beta/openai/',
-        'openai'   => 'https://api.openai.com/v1/',
-        'claude'   => 'https://api.anthropic.com/v1/',  // routed to ClaudeClient; kept for completeness
+        'gemini' => 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        'openai' => 'https://api.openai.com/v1/',
+        // 'claude' is intentionally absent — AnalyzeCommand routes it to ClaudeClient instead.
     ];
 
     public function __construct(
@@ -33,7 +42,8 @@ PROMPT;
         private readonly string $baseUrl,
         private readonly string $model,
         private readonly int $timeout = 30,
-    ) {}
+    ) {
+    }
 
     public static function forProvider(string $provider, string $apiKey, string $model, int $timeout = 30): self
     {

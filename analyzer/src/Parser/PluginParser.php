@@ -19,7 +19,8 @@ class PluginParser
         private readonly array $phpVisitors,
         private readonly ?JavaScriptVisitor $jsVisitor = null,
         private readonly ?BlockJsonVisitor $blockJsonVisitor = null,
-    ) {}
+    ) {
+    }
 
     /**
      * Parse all PHP files and run them through the registered PHP visitors.

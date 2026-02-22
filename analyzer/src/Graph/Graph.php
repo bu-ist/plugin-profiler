@@ -14,5 +14,6 @@ class Graph
         public readonly array $nodes,
         public readonly array $edges,
         public readonly PluginMetadata $plugin,
-    ) {}
+    ) {
+    }
 }

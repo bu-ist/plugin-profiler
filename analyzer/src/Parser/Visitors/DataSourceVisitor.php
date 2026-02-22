@@ -22,9 +22,19 @@ class DataSourceVisitor extends NamespaceAwareVisitor
     private const TRANSIENT_READ  = ['get_transient'];
     private const TRANSIENT_WRITE = ['set_transient'];
     private const TRANSIENT_DELETE = ['delete_transient'];
-    private const WPDB_READ  = ['get_results', 'get_row', 'get_var', 'get_col', 'query'];
-    private const WPDB_WRITE = ['insert', 'update', 'replace'];
+    private const WPDB_READ   = ['get_results', 'get_row', 'get_var', 'get_col', 'query'];
+    private const WPDB_WRITE  = ['insert', 'update', 'replace'];
     private const WPDB_DELETE = ['delete'];
+
+    // Generic PDO — any variable whose name contains "pdo" (e.g. $pdo, $pdoDb).
+    // Type inference is not available at this AST level; variable-name heuristics
+    // are the standard practice for this class of static analysis tool.
+    private const PDO_READ  = ['query', 'prepare'];
+    private const PDO_WRITE = ['exec', 'execute'];
+
+    // Generic MySQLi — any variable whose name contains "mysqli".
+    private const MYSQLI_READ  = ['query', 'prepare'];
+    private const MYSQLI_WRITE = ['execute'];
 
     /** Current enclosing function/method ID for edge source */
     private string $currentFunctionId = '';
@@ -55,6 +65,8 @@ class DataSourceVisitor extends NamespaceAwareVisitor
 
         if ($node instanceof Expr\MethodCall) {
             $this->handleWpdbCall($node);
+            $this->handlePdoCall($node);
+            $this->handleMysqliCall($node);
         }
 
         return null;
@@ -132,6 +144,78 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         }
 
         $this->createDataNode($operation, 'database', $key, $node->getStartLine());
+    }
+
+    /**
+     * Detect PDO database calls on variables whose name contains "pdo"
+     * (e.g. $pdo, $pdoDb, $myPdoConnection).
+     *
+     * Matched methods: query / prepare (read), exec / execute (write).
+     */
+    private function handlePdoCall(Expr\MethodCall $node): void
+    {
+        if (!$node->var instanceof Expr\Variable) {
+            return;
+        }
+
+        $varName = is_string($node->var->name) ? strtolower($node->var->name) : '';
+        if (!str_contains($varName, 'pdo')) {
+            return;
+        }
+
+        if (!$node->name instanceof Node\Identifier) {
+            return;
+        }
+
+        $methodName = $node->name->toString();
+
+        $operation = match (true) {
+            in_array($methodName, self::PDO_READ, true)  => 'read',
+            in_array($methodName, self::PDO_WRITE, true) => 'write',
+            default                                       => null,
+        };
+
+        if ($operation === null) {
+            return;
+        }
+
+        $this->createDataNode($operation, 'database', null, $node->getStartLine());
+    }
+
+    /**
+     * Detect MySQLi database calls on variables whose name contains "mysqli"
+     * (e.g. $mysqli, $db_mysqli, $mysqliConn).
+     *
+     * Matched methods: query / prepare (read), execute (write).
+     */
+    private function handleMysqliCall(Expr\MethodCall $node): void
+    {
+        if (!$node->var instanceof Expr\Variable) {
+            return;
+        }
+
+        $varName = is_string($node->var->name) ? strtolower($node->var->name) : '';
+        if (!str_contains($varName, 'mysqli')) {
+            return;
+        }
+
+        if (!$node->name instanceof Node\Identifier) {
+            return;
+        }
+
+        $methodName = $node->name->toString();
+
+        $operation = match (true) {
+            in_array($methodName, self::MYSQLI_READ, true)  => 'read',
+            in_array($methodName, self::MYSQLI_WRITE, true) => 'write',
+            default                                          => null,
+        };
+
+        if ($operation === null) {
+            return;
+        }
+
+        $this->createDataNode($operation, 'database', null, $node->getStartLine());
     }
 
     private function resolveKeyArg(Expr\FuncCall $node, ?string $subtype): ?string

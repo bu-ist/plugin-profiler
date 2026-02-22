@@ -152,7 +152,9 @@ class DescriptionGeneratorTest extends TestCase
 function collect_by_id(array $batch, string $id): ?array
 {
     foreach ($batch as $item) {
-        if (($item['id'] ?? null) === $id) return $item;
+        if (($item['id'] ?? null) === $id) {
+            return $item;
+        }
     }
     return null;
 }

@@ -20,5 +20,6 @@ class PluginMetadata
         public readonly string $hostPath = '',
         public readonly int $phpFiles = 0,
         public readonly int $jsFiles = 0,
-    ) {}
+    ) {
+    }
 }

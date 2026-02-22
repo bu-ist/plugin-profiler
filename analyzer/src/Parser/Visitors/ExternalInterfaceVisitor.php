@@ -10,6 +10,13 @@ use PhpParser\Node\Scalar;
 use PluginProfiler\Graph\Edge;
 use PluginProfiler\Graph\Node as GraphNode;
 
+/**
+ * Detects WordPress external interface registrations in PHP AST nodes.
+ *
+ * Creates graph nodes and `registers` edges for: REST endpoints, shortcodes,
+ * admin pages, cron jobs, custom post types, taxonomies, outbound HTTP calls,
+ * and AJAX handlers registered via `wp_ajax_*` / `wp_ajax_nopriv_*` hooks.
+ */
 class ExternalInterfaceVisitor extends NamespaceAwareVisitor
 {
     public function enterNode(Node $node): ?int
@@ -288,7 +295,15 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
         $this->addCallerEdge($nodeId, 'registers_ajax');
     }
 
-    /** @param array<Node\Arg|Node\VariadicPlaceholder>|null $argsArray */
+    /**
+     * Extracts HTTP methods from the third argument of register_rest_route().
+     *
+     * Looks for a `methods` key inside the options array literal. Falls back
+     * to `['GET']` when the argument is absent or the key cannot be resolved
+     * statically (e.g. dynamic values or variable references).
+     *
+     * @return array<string>
+     */
     private function resolveRestMethods(mixed $value): array
     {
         if ($value === null) {

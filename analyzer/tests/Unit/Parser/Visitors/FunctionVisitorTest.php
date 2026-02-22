@@ -114,4 +114,39 @@ class FunctionVisitorTest extends TestCase
         $node = $this->collection->getNode('func_documented');
         $this->assertStringContainsString('Does something', $node?->docblock ?? '');
     }
+
+    public function testEnterNode_WithNewExpression_CreatesInstantiatesEdge(): void
+    {
+        $this->parse('<?php class Factory { public function build() { return new Product(); } }');
+
+        $edges = $this->collection->getAllEdges();
+        $instantiatesEdges = array_filter($edges, static fn ($e) => $e->type === 'instantiates');
+
+        $this->assertCount(1, $instantiatesEdges, 'Expected exactly one instantiates edge');
+
+        $edge = reset($instantiatesEdges);
+        $this->assertSame('method_Factory_build', $edge->source);
+        $this->assertSame('class_Product', $edge->target);
+        $this->assertSame('new', $edge->label);
+    }
+
+    public function testEnterNode_WithAnonymousNew_SkipsEdge(): void
+    {
+        $this->parse('<?php class Foo { public function make() { return new class {}; } }');
+
+        $edges = $this->collection->getAllEdges();
+        $instantiatesEdges = array_filter($edges, static fn ($e) => $e->type === 'instantiates');
+
+        $this->assertEmpty($instantiatesEdges, 'Anonymous class instantiation should produce no edge');
+    }
+
+    public function testEnterNode_WithNewOutsideFunction_SkipsEdge(): void
+    {
+        $this->parse('<?php $obj = new SomeClass();');
+
+        $edges = $this->collection->getAllEdges();
+        $instantiatesEdges = array_filter($edges, static fn ($e) => $e->type === 'instantiates');
+
+        $this->assertEmpty($instantiatesEdges, 'File-scope instantiation should produce no edge');
+    }
 }

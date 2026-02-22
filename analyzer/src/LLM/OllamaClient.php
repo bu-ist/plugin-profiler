@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace PluginProfiler\LLM;
 
+/**
+ * Ollama client using the /api/chat endpoint.
+ *
+ * Uses the chat endpoint rather than the legacy /api/generate so that the
+ * system prompt and user message are sent as distinct roles. Instruction-tuned
+ * models (e.g. qwen2.5-coder) follow role-separated prompts significantly
+ * better than a single concatenated string.
+ *
+ * @see https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+ */
 class OllamaClient implements LLMClientInterface
 {
     private const SYSTEM_PROMPT = <<<'PROMPT'
@@ -26,27 +36,31 @@ PROMPT;
         private readonly string $ollamaHost,
         private readonly string $model,
         private readonly int $timeout = 120,
-    ) {}
+    ) {
+    }
 
     public function generateDescriptions(array $entityBatch): array
     {
-        $prompt  = self::SYSTEM_PROMPT . "\n\n" . json_encode(['entities' => $entityBatch], JSON_UNESCAPED_UNICODE);
         $payload = json_encode([
-            'model'  => $this->model,
-            'prompt' => $prompt,
-            'stream' => false,
+            'model'    => $this->model,
+            'stream'   => false,
+            'messages' => [
+                ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+                ['role' => 'user',   'content' => json_encode(['entities' => $entityBatch], JSON_UNESCAPED_UNICODE)],
+            ],
         ]);
 
         $context = stream_context_create([
             'http' => [
-                'method'  => 'POST',
-                'header'  => "Content-Type: application/json\r\n",
-                'content' => $payload,
-                'timeout' => $this->timeout,
+                'method'        => 'POST',
+                'header'        => "Content-Type: application/json\r\n",
+                'content'       => $payload,
+                'timeout'       => $this->timeout,
+                'ignore_errors' => true,
             ],
         ]);
 
-        $responseRaw = @file_get_contents($this->ollamaHost . '/api/generate', false, $context);
+        $responseRaw = @file_get_contents($this->ollamaHost . '/api/chat', false, $context);
         if ($responseRaw === false) {
             fwrite(STDERR, "Warning: Could not connect to Ollama at {$this->ollamaHost}\n");
 
@@ -54,13 +68,13 @@ PROMPT;
         }
 
         $response = json_decode($responseRaw, true);
-        if (!is_array($response) || !isset($response['response'])) {
+        if (!is_array($response) || !isset($response['message']['content'])) {
             fwrite(STDERR, "Warning: Unexpected Ollama response format\n");
 
             return [];
         }
 
-        return $this->parseDescriptions($response['response']);
+        return $this->parseDescriptions($response['message']['content']);
     }
 
     private function parseDescriptions(string $raw): array

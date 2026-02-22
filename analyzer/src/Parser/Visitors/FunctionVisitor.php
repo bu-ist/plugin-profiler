@@ -6,12 +6,11 @@ namespace PluginProfiler\Parser\Visitors;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr;
-use PhpParser\Node\Stmt;
-use PhpParser\Node\ComplexType;
 use PhpParser\Node\Identifier;
-use PhpParser\Node\NullableType;
-use PhpParser\Node\UnionType;
 use PhpParser\Node\IntersectionType;
+use PhpParser\Node\NullableType;
+use PhpParser\Node\Stmt;
+use PhpParser\Node\UnionType;
 use PluginProfiler\Graph\Edge;
 use PluginProfiler\Graph\Node as GraphNode;
 
@@ -27,6 +26,8 @@ class FunctionVisitor extends NamespaceAwareVisitor
             $this->handleFunction($node);
         } elseif ($node instanceof Expr\StaticCall) {
             $this->handleStaticCall($node);
+        } elseif ($node instanceof Expr\New_) {
+            $this->handleNewExpression($node);
         }
 
         return null;
@@ -56,6 +57,35 @@ class FunctionVisitor extends NamespaceAwareVisitor
 
         $classId = 'class_' . $calledClass;
         $this->collection->addEdge(Edge::make($callerId, $classId, 'calls', 'calls'));
+    }
+
+    /**
+     * Detect `new ClassName()` expressions and create an 'instantiates' edge from
+     * the enclosing method/function to the instantiated class.
+     *
+     * Skips:
+     *  - Anonymous classes (`new class {}`) — no stable target node.
+     *  - `new self()` / `new static()` / `new parent()` — intra-class noise.
+     *  - Instantiation at file scope — no meaningful source node to draw from.
+     */
+    private function handleNewExpression(Expr\New_ $node): void
+    {
+        $callerId = $this->currentCallerId();
+        if ($callerId === null) {
+            return; // File-scope instantiation — no enclosing function/method
+        }
+
+        if (!$node->class instanceof Node\Name) {
+            return; // Anonymous class expression — skip
+        }
+
+        $className = $node->class->toString();
+        if (in_array($className, ['self', 'static', 'parent'], true)) {
+            return; // Intra-class reference — adds noise without value
+        }
+
+        $classId = 'class_' . $className;
+        $this->collection->addEdge(Edge::make($callerId, $classId, 'instantiates', 'new'));
     }
 
     private function handleMethod(Stmt\ClassMethod $node): void
