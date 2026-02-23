@@ -33,7 +33,12 @@ let _viewMode   = 'all';  // current edge view mode ('all' | 'structure' | 'beha
 
 /**
  * Pick the most-connected nodes to render when the graph exceeds RENDER_CAP.
- * Prioritises nodes with the most edges so the rendered subgraph is meaningful.
+ *
+ * Developer nodes are ALWAYS included regardless of degree — they are what the
+ * user came to see. Library nodes (data.is_library === true) fill the remaining
+ * slots in degree order. This prevents large bundled libraries (e.g. Ext JS with
+ * thousands of highly-connected nodes) from crowding out the developer code.
+ *
  * Returns { nodes, edges, truncated } where truncated = true if capped.
  */
 function capElements(allNodes, allEdges) {
@@ -49,11 +54,16 @@ function capElements(allNodes, allEdges) {
     degree[t] = (degree[t] || 0) + 1;
   }
 
-  // Sort nodes by degree descending, take top RENDER_CAP
-  const sorted = [...allNodes].sort((a, b) =>
-    (degree[b.data.id] || 0) - (degree[a.data.id] || 0)
-  );
-  const kept  = new Set(sorted.slice(0, RENDER_CAP).map(n => n.data.id));
+  // Partition: developer nodes are always kept; library nodes fill remaining slots
+  const devNodes = allNodes.filter(n => !n.data.is_library);
+  const libNodes = allNodes.filter(n =>  n.data.is_library);
+
+  const libSlots  = Math.max(0, RENDER_CAP - devNodes.length);
+  const keptLib   = [...libNodes]
+    .sort((a, b) => (degree[b.data.id] || 0) - (degree[a.data.id] || 0))
+    .slice(0, libSlots);
+
+  const kept  = new Set([...devNodes, ...keptLib].map(n => n.data.id));
   const nodes = allNodes.filter(n => kept.has(n.data.id));
   const edges = allEdges.filter(e => kept.has(e.data.source) && kept.has(e.data.target));
 
