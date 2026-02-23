@@ -167,19 +167,18 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   // No banner needed when every node is visible
   if (!isFocused || focusCount >= totalCount) return;
 
-  const layout = document.getElementById('main-layout');
-  if (!layout) return;
-  layout.style.position = 'relative';
-
+  // Use fixed positioning so the banner floats above the Cytoscape canvas
+  // without being clipped or intercepted by canvas pointer events.
+  // Bottom-center placement keeps it out of the graph workspace.
   const banner = document.createElement('div');
   banner.id = 'status-banner';
-  banner.className = 'absolute top-14 left-1/2 -translate-x-1/2 z-10 bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg';
+  banner.className = 'fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg whitespace-nowrap';
   banner.innerHTML = `
     <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
-    <button id="show-all-link" class="text-blue-400 hover:text-blue-300 underline whitespace-nowrap">Show all →</button>
-    <button id="banner-dismiss" class="ml-1 text-slate-500 hover:text-white font-bold leading-none" title="Dismiss">✕</button>
+    <button id="show-all-link" class="text-blue-400 hover:text-blue-300 underline" title="Switch to full graph view">Show all →</button>
+    <button id="banner-dismiss" class="ml-1 text-slate-400 hover:text-white text-sm leading-none" title="Dismiss">✕</button>
   `;
-  layout.prepend(banner);
+  document.body.appendChild(banner);
 
   document.getElementById('show-all-link')?.addEventListener('click', () => {
     _isFocused = false;

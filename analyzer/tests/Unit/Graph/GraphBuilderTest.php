@@ -310,4 +310,50 @@ class GraphBuilderTest extends TestCase
 
         $this->assertTrue($graph->nodes[0]->isLibrary);
     }
+
+    // ── Inline minified code detection ────────────────────────────────────────
+
+    public function testBuild_JsFunctionWithSingleCharLabel_IsTaggedIsLibrary(): void
+    {
+        // Single-char JS function names (b, c, d) come from inline minified libraries
+        // copy-pasted into developer files — never from developer-written code
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'b', type: 'js_function', file: '/plugin/js-dev/classnotes-page.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_JsFunctionWithTwoCharLabel_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'fn', type: 'js_function', file: '/plugin/js/app.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_JsFunctionWithThreeCharLabel_IsNotTaggedIsLibrary(): void
+    {
+        // Three-char names are legitimate developer abbreviations (e.g. "get", "run")
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'run', type: 'js_function', file: '/plugin/js/app.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_PhpFunctionWithSingleCharLabel_IsNotTaggedIsLibrary(): void
+    {
+        // Short-name detection only applies to JS — PHP minification is extremely rare
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'f', type: 'function', file: '/plugin/includes/helpers.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
 }

@@ -228,6 +228,16 @@ class GraphBuilder
         foreach ($nodes as $node) {
             if ($this->isLibraryFile($node->file)) {
                 $node->isLibrary = true;
+                continue;
+            }
+            // Short-name JS symbols (1–2 chars) come from inline minified code
+            // copy-pasted into a developer file. No developer writes a module-level
+            // JS function named `b` or `c`, so tag these as library noise.
+            if (
+                in_array($node->type, ['js_function', 'js_class'], true)
+                && strlen($node->label) <= 2
+            ) {
+                $node->isLibrary = true;
             }
         }
 
