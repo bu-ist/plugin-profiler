@@ -13,6 +13,7 @@ use PluginProfiler\Graph\PluginMetadata;
 use PluginProfiler\LLM\ApiClient;
 use PluginProfiler\LLM\ClaudeClient;
 use PluginProfiler\LLM\DescriptionGenerator;
+use PluginProfiler\LLM\DocblockDescriptionExtractor;
 use PluginProfiler\LLM\OllamaClient;
 use PluginProfiler\Parser\PluginParser;
 use PluginProfiler\Parser\Visitors\BlockJsonVisitor;
@@ -197,6 +198,11 @@ class AnalyzeCommand extends Command
                 }
             }
         }
+
+        // Step 5b: Populate descriptions from docblocks for nodes without LLM descriptions.
+        // Runs regardless of --no-descriptions so entities with PHPDoc comments
+        // always get at least a minimal description in the graph output.
+        (new DocblockDescriptionExtractor())->extract($graph);
 
         // Step 6: Export
         $output->writeln(sprintf('<comment>Writing output to %s...</comment>', $outputFile));
