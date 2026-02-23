@@ -8,11 +8,13 @@ Plugin Profiler is a Dockerized static analysis tool that scans a WordPress plug
 
 ## Screenshots
 
-> _Run the tool against your plugin, then open `http://localhost:9000` to see a graph like this._
+> _Analyzing [BU Calendar](https://github.com/bu-ist/bu-calendar-plugin) v1.6.0 (149 nodes, 147 edges). Run takes ~20 seconds with `--no-descriptions`, ~45 seconds with Claude Haiku._
 
-| Graph view — BU Calendar (149 nodes) | Node inspector — `BU_Calendar_Plugin` class |
+| Graph view — 100 key nodes by connectivity | `BU_Calendar_Plugin` class — connections at a glance |
 |---|---|
-| [![Graph view showing 100 of 149 key nodes with fCoSE layout and AI Architecture Overview sidebar](docs/images/overview.png)](docs/images/overview.png) | [![Node inspector sidebar showing AI Insight, file location, and typed connections](docs/images/node-detail.png)](docs/images/node-detail.png) |
+| [![BU Calendar plugin graph: fCoSE force-directed layout showing classes, hooks, methods, and data sources](docs/images/overview.png)](docs/images/overview.png) | [![BU_Calendar_Plugin class highlighted with its neighborhood — implements, instantiates, and method edges](docs/images/node-detail.png)](docs/images/node-detail.png) |
+
+The **Key nodes** view (default) shows the most-connected nodes plus one hop — so you see the plugin's core without the noise of 149 test utilities and helpers. Click **All nodes** in the toolbar to reveal everything.
 
 ---
 
@@ -252,10 +254,30 @@ Clicking a node opens a panel showing:
 | **Key nodes / All nodes** | Toggle between a focused view (top nodes by connectivity + 1-hop expansion) and the full graph |
 | **Structure / Behavior / All** | Filter edges to structural relationships only, behavioral (hooks, data, HTTP), or all |
 | **Groups** | Collapse/expand PHP namespace and JS directory compound nodes |
-| **Dev only** | Hide bundled library nodes — only shown when the plugin includes detected third-party code |
+| **⭐ Dev only** | Hide bundled library nodes — see below |
 | **Type filter buttons** | Toggle visibility for each node type (`1`–`9` keyboard shortcuts) |
 | **Layout dropdown** | Switch between Dagre (hierarchy), fCoSE (force-directed), Breadth-first, Grid |
 | **+ / − / Fit** | Zoom controls |
+
+### Dev only — filtering out bundled libraries
+
+Some plugins ship copies of third-party libraries inside the plugin directory (jQuery UI, Ext JS, Underscore, custom builds, etc.). Without filtering, these can add thousands of nodes that have nothing to do with the plugin you're auditing.
+
+**The "Dev only" button hides all library nodes**, leaving only the code the plugin's author actually wrote.
+
+Library detection is automatic — paths containing any of the following segments are tagged as library code:
+
+`lib/`, `libs/`, `vendor/` _(non-Composer)_, `third-party/`, `thirdparty/`, `bower_components/`, `packages/`, `dist/`, `build/`, `bundled/`, `dependencies/`, `external/`
+
+You can also add a `.profilerignore` file to the plugin root to explicitly exclude any path:
+
+```
+# .profilerignore
+assets/vendor/
+legacy/ext-js/
+```
+
+> **Tip:** The "Dev only" button only appears in the toolbar when library nodes are actually present in the analysis. For plugins with no bundled code it is hidden automatically.
 
 ### Keyboard shortcuts
 
