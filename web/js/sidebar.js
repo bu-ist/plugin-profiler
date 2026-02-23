@@ -130,7 +130,9 @@ function buildSidebarHtml(data) {
   const language = JS_TYPES.has(data.type) ? 'javascript' : 'php';
 
   const connections = buildConnectionsHtml(data);
-  const vscodePath = buildVsCodeLink(data);
+  const vscodePath  = buildVsCodeLink(data);
+  // Display path: strip the /plugin container prefix for readability.
+  const displayFile = data.file?.replace(/^\/plugin\//, '') ?? data.file;
   const sourceHtml = data.source_preview
     ? `<pre class="text-xs overflow-x-auto"><code class="language-${language}">${escapeHtml(data.source_preview)}</code></pre>`
     : '<p class="text-gray-400 text-xs italic">No source preview available.</p>';
@@ -160,8 +162,8 @@ function buildSidebarHtml(data) {
     <div class="text-xs text-gray-400 mb-3">
       <span class="text-gray-500">File:</span>
       ${vscodePath
-        ? `<a href="${vscodePath}" class="text-blue-400 hover:underline break-all">${escapeHtml(data.file)}:${data.line}</a>`
-        : `<span class="break-all">${escapeHtml(data.file)}:${data.line}</span>`}
+        ? `<a href="${vscodePath}" class="text-blue-400 hover:underline break-all">${escapeHtml(displayFile)}:${data.line}</a>`
+        : `<span class="break-all">${escapeHtml(displayFile)}:${data.line}</span>`}
     </div>
 
     ${connections}
@@ -212,7 +214,17 @@ function buildConnectionsHtml(data) {
 
 function buildVsCodeLink(data) {
   if (!data.file) return null;
-  return `vscode://file/${data.file}:${data.line || 0}`;
+
+  // File paths in graph-data.json are container-internal (e.g. /plugin/src/foo.php).
+  // When PLUGIN_PATH is set, graph-data.json carries host_path (e.g. /Users/…/bu-banners).
+  // Replace the /plugin prefix so the vscode:// URI opens the real file on the host.
+  let filePath = data.file;
+  const hostPath = _pluginData?.host_path;
+  if (hostPath && filePath.startsWith('/plugin')) {
+    filePath = hostPath.replace(/\/$/, '') + filePath.slice('/plugin'.length);
+  }
+
+  return `vscode://file/${filePath}:${data.line || 0}`;
 }
 
 /**
