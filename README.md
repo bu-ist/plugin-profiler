@@ -151,16 +151,22 @@ plugin-profiler analyze ./my-plugin --no-descriptions --json-only
 
 ## LLM description generation
 
-Plugin Profiler can generate a 2–3 sentence description for every node in the graph using an LLM. This is optional — pass `--no-descriptions` to skip it.
+Plugin Profiler can generate a 2–3 sentence description for every developer-authored node in the graph using an LLM. This is optional — pass `--no-descriptions` to skip it.
+
+Descriptions are only generated for nodes the developer actually wrote. Bundled libraries (detected from directory names like `lib/`, `third-party/`, `bower_components/`, etc.) are automatically skipped.
+
+Nodes with a PHPDoc block automatically get a description from that block even without an LLM. LLM descriptions take precedence when both are present.
 
 ### Supported providers
 
-| Provider | `--llm` value | Cost (Gravity Forms ~250 entities) |
-|---|---|---|
-| **Ollama (local)** | `ollama` | Free |
-| **Claude Haiku** | `claude` | ~$0.01 |
-| OpenAI GPT-4o mini | `openai` | ~$0.11 |
-| Google Gemini 2.0 Flash | `gemini` | ~$0.03 |
+| Provider | `--llm` value | Speed (100 dev nodes) | Cost (100 nodes) |
+|---|---|---|---|
+| **Ollama (local)** | `ollama` | ~2–5 min | Free |
+| **Claude Haiku** | `claude` | ~30–60 sec | ~$0.01 |
+| OpenAI GPT-4o mini | `openai` | ~1–2 min | ~$0.04 |
+| Google Gemini 2.0 Flash | `gemini` | ~1–2 min | ~$0.01 |
+
+> **Note on analysis time:** Parsing is the main bottleneck for large plugins, not the LLM. A plugin with 1,000+ JS files (e.g. one bundling Ext JS) can take 5–8 minutes to parse before descriptions even begin. Use `--no-descriptions` for quick iteration; only run with an LLM provider when you want the final annotated graph.
 
 ### Ollama (local, default)
 
@@ -170,17 +176,24 @@ When `--llm ollama` is used, Plugin Profiler starts an `ollama` Docker container
 plugin-profiler analyze ./my-plugin --llm ollama --model qwen2.5-coder:7b
 ```
 
-First run with Ollama will take extra time while the model downloads (~4 GB for qwen2.5-coder:7b).
+**First run:** model download is ~4 GB for `qwen2.5-coder:7b`; subsequent runs use the cached `ollama_models` Docker volume.
+**Speed:** Ollama runs on CPU by default, so expect ~2–5 min per 100 nodes. Use a smaller model (`qwen2.5-coder:3b`) to halve that.
 
 ### External API providers
 
-All external providers use the OpenAI-compatible chat completions API format.
+Claude Haiku is the fastest and cheapest option for most plugins. All external providers use the OpenAI-compatible chat completions API format.
 
 ```bash
+# Claude (fastest, recommended for large plugins)
+plugin-profiler analyze ./my-plugin \
+  --llm claude \
+  --model claude-haiku-4-5-20251001 \
+  --api-key sk-ant-...
+
 # Gemini
 plugin-profiler analyze ./my-plugin \
   --llm gemini \
-  --model gemini-2.5-flash \
+  --model gemini-2.0-flash \
   --api-key AIza...
 
 # OpenAI
@@ -188,6 +201,22 @@ plugin-profiler analyze ./my-plugin \
   --llm openai \
   --model gpt-4o-mini \
   --api-key sk-...
+```
+
+### Using environment variables
+
+Instead of passing `--llm` and `--api-key` on every run, copy `.env.example` to `.env`:
+
+```dotenv
+LLM_PROVIDER=claude
+LLM_MODEL=claude-haiku-4-5-20251001
+LLM_API_KEY=sk-ant-...
+```
+
+Then run without flags:
+
+```bash
+plugin-profiler analyze ./my-plugin
 ```
 
 ---
@@ -220,7 +249,11 @@ Clicking a node opens a panel showing:
 | Control | Purpose |
 |---|---|
 | **Search box** | Filter nodes by label in real time |
-| **Type filter buttons** | Toggle visibility for each node type |
+| **Key nodes / All nodes** | Toggle between a focused view (top nodes by connectivity + 1-hop expansion) and the full graph |
+| **Structure / Behavior / All** | Filter edges to structural relationships only, behavioral (hooks, data, HTTP), or all |
+| **Groups** | Collapse/expand PHP namespace and JS directory compound nodes |
+| **Dev only** | Hide bundled library nodes — only shown when the plugin includes detected third-party code |
+| **Type filter buttons** | Toggle visibility for each node type (`1`–`9` keyboard shortcuts) |
 | **Layout dropdown** | Switch between Dagre (hierarchy), fCoSE (force-directed), Breadth-first, Grid |
 | **+ / − / Fit** | Zoom controls |
 
@@ -374,7 +407,7 @@ Vanilla JavaScript — no build step. Loaded via CDN:
 All tests require Docker (local PHP is likely not 8.1):
 
 ```bash
-# Build the test image and run all 191 tests
+# Build the test image and run all 211 tests
 docker build --target test -t plugin-profiler-test ./analyzer
 docker run --rm plugin-profiler-test
 ```
@@ -540,7 +573,7 @@ This repository ships a GitHub Actions workflow (`.github/workflows/ci.yml`) wit
 
 | Job | What it checks |
 |---|---|
-| **PHP Tests** | Runs all 191 PHPUnit tests on PHP 8.1; checks PSR-12 style with php-cs-fixer |
+| **PHP Tests** | Runs all 211 PHPUnit tests on PHP 8.1; checks PSR-12 style with php-cs-fixer |
 | **Docker Build** | Confirms both `analyzer` and `web` images build cleanly |
 | **JS Lint** | Runs ESLint on `web/js/` |
 
