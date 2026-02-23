@@ -80,7 +80,8 @@ class FileVisitor extends NamespaceAwareVisitor
             return $resolved;
         }
 
-        // __DIR__ . '/path'  or  dirname(__FILE__) . '/path'
+        // __DIR__ . '/path'  or  dirname(__FILE__) . '/path'  or
+        // plugin_dir_path(__FILE__) . 'path'
         if ($expr instanceof Expr\BinaryOp\Concat) {
             $left  = $expr->left;
             $right = $expr->right;
@@ -90,6 +91,17 @@ class FileVisitor extends NamespaceAwareVisitor
 
             if ($leftStr !== null && $rightStr !== null) {
                 $resolved = realpath($leftStr . $rightStr) ?: $leftStr . $rightStr;
+
+                return $resolved;
+            }
+
+            // Fallback: left side is an unresolvable constant or expression
+            // (e.g. PLUGIN_CONST . '/includes/foo.php').  Use the string-literal
+            // suffix combined with the current file's directory as a best-effort
+            // path so nodes get meaningful labels instead of 'dynamic'.
+            if ($leftStr === null && $rightStr !== null && str_ends_with($rightStr, '.php')) {
+                $guessed  = dirname($currentFile) . '/' . ltrim($rightStr, '/');
+                $resolved = realpath($guessed) ?: $guessed;
 
                 return $resolved;
             }

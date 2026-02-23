@@ -95,6 +95,26 @@ class FileVisitorTest extends TestCase
         $this->assertContains('helpers.php', $labels);
     }
 
+    public function testEnterNode_WithConstantConcatPath_ResolvesLabel(): void
+    {
+        // PLUGIN_CONST . '/includes/foo.php' — the constant can't be statically
+        // resolved, but the string-literal suffix should still produce a meaningful
+        // label rather than 'dynamic'.
+        $this->visitor->setPluginRoot('/plugin');
+        $this->parse(
+            '<?php require_once PLUGIN_DIR . \'/includes/class-nav.php\';',
+            '/plugin/plugin.php',
+        );
+
+        $nodes  = $this->collection->getAllNodes();
+        $labels = array_map(static fn ($n) => $n->label, array_values(
+            array_filter($nodes, static fn ($n) => $n->type === 'file')
+        ));
+
+        $this->assertNotContains('dynamic', $labels, 'Constant-based concat should not produce a dynamic label');
+        $this->assertContains('class-nav.php', $labels);
+    }
+
     public function testEnterNode_BothSourceAndTargetFileNodesExist(): void
     {
         $this->parse('<?php require "something.php";');
