@@ -31,6 +31,19 @@ services:
     volumes:
       - output:/usr/share/nginx/html/data:ro
 
+  # Controller: accepts POST /analyze from the browser UI and triggers a fresh
+  # analysis run via the Docker socket. Runs on port 9001.
+  # Start with: docker compose up -d controller
+  controller:
+    build:
+      context: ./controller
+    ports:
+      - "9001:9001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/project:ro
+      - output:/project/output
+
   # Ollama only starts when you explicitly request the llm profile:
   #   docker compose --profile llm up -d ollama
   # Pre-pull the model before first use to avoid timeout during analysis:

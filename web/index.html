@@ -63,11 +63,18 @@
   </div>
 
   <!-- Toolbar -->
-  <header class="h-12 bg-gray-800 border-b border-gray-700 flex items-center gap-3 px-4 shrink-0">
+  <header class="bg-gray-800 border-b border-gray-700 flex flex-col shrink-0">
+  <div class="h-12 flex items-center gap-3 px-4">
     <div class="flex items-center gap-2 mr-2 shrink-0">
       <span class="text-pink-400 font-bold text-sm">&#x25CE;</span>
-      <span id="plugin-name" class="font-semibold text-sm truncate max-w-[180px]">Plugin Profiler</span>
-      <span id="plugin-version" class="text-gray-400 text-xs"></span>
+      <div class="flex flex-col leading-tight min-w-0">
+        <div class="flex items-center gap-1">
+          <span id="plugin-name" class="font-semibold text-sm truncate max-w-[180px]">Plugin Profiler</span>
+          <span id="plugin-version" class="text-gray-400 text-xs shrink-0"></span>
+          <button id="reanalyze-btn" class="hidden text-slate-500 hover:text-white text-sm leading-none" title="Re-analyze a different path">↻</button>
+        </div>
+        <span id="plugin-path" class="hidden text-[10px] text-slate-600 font-mono truncate max-w-[260px]" title="Analyzed plugin path"></span>
+      </div>
     </div>
 
     <!-- Search -->
@@ -83,9 +90,6 @@
       />
       <datalist id="node-labels"></datalist>
     </div>
-
-    <!-- Type filters -->
-    <div id="type-filters" class="flex flex-wrap gap-1 min-w-0 overflow-hidden"></div>
 
     <div class="ml-auto flex items-center gap-2 shrink-0">
       <!-- Stats -->
@@ -143,7 +147,19 @@
       <button id="zoom-out" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom Out">−</button>
       <button id="zoom-fit" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Fit (F)">Fit</button>
     </div>
+  </div>
+  <!-- Type filter buttons — second row, shown after graph loads -->
+  <div id="type-filters" class="hidden flex-wrap gap-1 px-4 py-1.5 border-t border-gray-700 overflow-x-auto"></div>
   </header>
+
+  <!-- Re-analyze panel — hidden by default, shown when ↻ is clicked -->
+  <div id="reanalyze-panel" class="hidden fixed top-12 left-1/2 -translate-x-1/2 z-[300] bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 flex items-center gap-2 w-[540px]">
+    <input id="reanalyze-path" type="text" placeholder="/absolute/path/to/plugin"
+      class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500" />
+    <button id="reanalyze-submit" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium shrink-0">Analyze</button>
+    <button id="reanalyze-cancel" class="px-2 py-1.5 text-slate-400 hover:text-white text-sm leading-none shrink-0">✕</button>
+    <span id="reanalyze-status" class="hidden text-xs text-slate-400 shrink-0"></span>
+  </div>
 
   <!-- Main layout (always in DOM so Cytoscape can size itself) -->
   <div id="main-layout" class="flex-1 flex min-h-0">

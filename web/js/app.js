@@ -1,7 +1,7 @@
 import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
-import { initSearch, toggleLibraryFilter } from './search.js';
+import { initSearch, toggleLibraryFilter, isLibraryFilterActive } from './search.js';
 import { EDGE_VIEW_MODES } from './constants.js';
 import { escapeHtml } from './utils.js';
 
@@ -84,7 +84,7 @@ function capElements(allNodes, allEdges) {
  * @param {Object} pluginMeta - plugin block from graph-data.json.
  * @returns {{ nodes, edges, focusCount, totalCount }}
  */
-function buildFocusSet(allNodes, allEdges, pluginMeta) {
+function buildFocusSet(allNodes, allEdges, pluginMeta, hideLibrary = false) {
   // Count degree for every node
   const degree = {};
   for (const e of allEdges) {
@@ -92,8 +92,12 @@ function buildFocusSet(allNodes, allEdges, pluginMeta) {
     degree[e.data.target] = (degree[e.data.target] || 0) + 1;
   }
 
-  // Exclude compound group nodes from seeding
-  const leafNodes = allNodes.filter(n => n.data.type !== 'namespace' && n.data.type !== 'dir');
+  // Exclude compound group nodes and (optionally) library nodes from seeding
+  const leafNodes = allNodes.filter(n =>
+    n.data.type !== 'namespace' &&
+    n.data.type !== 'dir' &&
+    (!hideLibrary || !n.data.is_library)
+  );
 
   // Seed: main-file nodes + top FOCUS_PRIMARY by degree
   const primary  = new Set();
@@ -209,7 +213,7 @@ function switchView() {
   _cy.batch(() => {
     _cy.elements().remove();
     if (_isFocused) {
-      const f = buildFocusSet(_allNodes, _allEdges, _pluginMeta);
+      const f = buildFocusSet(_allNodes, _allEdges, _pluginMeta, isLibraryFilterActive());
       _cy.add([...f.nodes, ...f.edges]);
       updateFocusButton(f.focusCount, f.totalCount);
       showStatusBanner(f.focusCount, f.totalCount, true);
@@ -337,6 +341,60 @@ async function main() {
   document.getElementById('plugin-version').textContent = p.version ? `v${p.version}` : '';
   document.getElementById('plugin-stats').textContent   = `${totalNodes} nodes · ${totalEdges} edges`;
 
+  // Show host path + re-analyze button
+  const hostPath = p.host_path;
+  const pathEl   = document.getElementById('plugin-path');
+  if (pathEl && hostPath) {
+    pathEl.textContent = hostPath;
+    pathEl.title       = hostPath;
+    pathEl.classList.remove('hidden');
+    document.getElementById('reanalyze-btn')?.classList.remove('hidden');
+  }
+
+  // Re-analyze panel
+  const CONTROLLER_URL = 'http://localhost:9001';
+  document.getElementById('reanalyze-btn')?.addEventListener('click', () => {
+    const panel = document.getElementById('reanalyze-panel');
+    const input = document.getElementById('reanalyze-path');
+    if (input) input.value = hostPath || '';
+    document.getElementById('reanalyze-status')?.classList.add('hidden');
+    panel?.classList.toggle('hidden');
+  });
+  document.getElementById('reanalyze-cancel')?.addEventListener('click', () => {
+    document.getElementById('reanalyze-panel')?.classList.add('hidden');
+  });
+  document.getElementById('reanalyze-submit')?.addEventListener('click', async () => {
+    const path      = document.getElementById('reanalyze-path')?.value.trim();
+    if (!path) return;
+    const statusEl  = document.getElementById('reanalyze-status');
+    const submitBtn = document.getElementById('reanalyze-submit');
+    statusEl?.classList.remove('hidden');
+    if (statusEl) statusEl.textContent = 'Analyzing…';
+    if (submitBtn) submitBtn.disabled  = true;
+    try {
+      await fetch(`${CONTROLLER_URL}/analyze`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ path, noDescriptions: true }),
+      });
+      const startedAt = new Date().toISOString();
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch(`${CONTROLLER_URL}/status`);
+          const s = await r.json();
+          if (!s.running && s.analyzedAt && s.analyzedAt > startedAt) {
+            clearInterval(poll);
+            if (statusEl) statusEl.textContent = 'Done — reloading…';
+            setTimeout(() => location.reload(), 800);
+          }
+        } catch { /* controller not ready yet, keep polling */ }
+      }, 2000);
+    } catch {
+      if (statusEl) statusEl.textContent = 'Controller not reachable — is it running?';
+      if (submitBtn) submitBtn.disabled  = false;
+    }
+  });
+
   // Cap elements for rendering
   const { nodes, edges } = capElements(graphData.nodes || [], graphData.edges || []);
 
@@ -348,7 +406,7 @@ async function main() {
 
   // Build initial focus set — flat, no compound nodes
   setLoadingStatus('Building focus view…');
-  const focused = buildFocusSet(_allNodes, _allEdges, _pluginMeta);
+  const focused = buildFocusSet(_allNodes, _allEdges, _pluginMeta, isLibraryFilterActive());
 
   setLoadingStatus('Initialising graph…');
   // Initialise Cytoscape with just the focus set
@@ -449,6 +507,11 @@ async function main() {
   // initialised. The extension is registered in graph.js; the API is available
   // via _cy.expandCollapse('get') after the first call to _cy.expandCollapse({}).
   document.getElementById('collapse-btn')?.addEventListener('click', () => {
+    // Compound nodes only exist in show-all mode — auto-switch if needed
+    if (_isFocused) {
+      _isFocused = false;
+      switchView();
+    }
     const api        = _cy.expandCollapse('get');
     const groupNodes = _cy.nodes('[type = "namespace"], [type = "dir"]');
     if (!api || !groupNodes.length) return;
@@ -474,6 +537,8 @@ async function main() {
     if (lbl) lbl.textContent = hiding ? '⚙ Dev only (active)' : '⚙ Dev only';
     if (btn) btn.classList.toggle('bg-blue-700', hiding);
     if (btn) btn.classList.toggle('bg-gray-700', !hiding);
+    // In focus mode, rebuild the focus set with/without library nodes
+    if (_isFocused) switchView();
   });
 
   // Zoom controls — zoom toward the center of the viewport

@@ -37,6 +37,8 @@ export function toggleLibraryFilter() {
   return _hideLibrary;
 }
 
+export function isLibraryFilterActive() { return _hideLibrary; }
+
 function bindSearchInput() {
   const input = document.getElementById('search-input');
   if (!input) return;
@@ -68,6 +70,9 @@ function buildTypeFilters(allTypes) {
     btn.addEventListener('click', () => toggleType(type, btn));
     container.appendChild(btn);
   });
+  // Show the filter row now that it has buttons
+  container.classList.remove('hidden');
+  container.classList.add('flex');
 }
 
 function toggleType(type, btn) {
