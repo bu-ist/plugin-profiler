@@ -193,7 +193,7 @@ fi
 
 # ── Build images ────────────────────────────────────────────────────────────
 info "Building containers (first run may take a minute)..."
-docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} build analyzer web 2>&1 \
+docker compose "${COMPOSE_ARGS[@]}" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} build analyzer web controller 2>&1 \
     | grep -v "^#" | grep -v "^$" | sed 's/^/  /' || true
 echo ""
 
@@ -242,7 +242,7 @@ echo ""
 # ── Start web server (unless json-only) ─────────────────────────────────────
 if ! $JSON_ONLY; then
     info "Starting web server..."
-    docker compose "${COMPOSE_ARGS[@]}" up -d web
+    docker compose "${COMPOSE_ARGS[@]}" up -d web controller
 
     URL="http://localhost:$PORT"
     echo ""
