@@ -24,6 +24,28 @@ class GraphBuilder
         'third-party', 'thirdparty',
         'bower_components',
         'external', 'externals',
+        // Polyfill bundles (e.g. js-dev/polyfills/)
+        'polyfills',
+        // Common WP plugin patterns for bundled libraries
+        'libraries',
+        // Well-known third-party SDKs bundled inside plugins
+        'freemius',                 // Freemius monetisation SDK
+        'plugin-update-checker',    // YahnisElsts update checker
+        'tgm-plugin-activation',    // TGMPA required plugin activator
+        'cmb2',                     // CMB2 custom meta boxes
+        // Bundled email/template/CSS libraries (when appearing as top-level dirs)
+        'phpmailer', 'swiftmailer',
+        'tinymce', 'ckeditor', 'codemirror',
+        'select2', 'chosen',
+        'sweetalert2',
+        'leaflet',
+        'dropzone', 'plupload',
+        'datatables',
+        'fullcalendar',
+        'tcpdf', 'fpdf', 'mpdf', 'dompdf',
+        'htmlpurifier',
+        'parsedown',
+        'simplepie',
     ];
 
     /**
@@ -32,33 +54,98 @@ class GraphBuilder
      * Matched against the basename without extension.
      * Examples: jquery.js, jquery-3.6.0.js, jquery.validate.js,
      *           backbone.js, underscore.js, lodash.js, bootstrap.js.
+     *
+     * The prefix check matches either an exact stem or any stem starting with
+     * `{prefix}-` or `{prefix}.` — so `jquery` covers jquery.js,
+     * jquery-3.6.0.js, jquery.validate.min.js, etc.
      */
     private const LIBRARY_FILENAME_PREFIXES = [
-        // JS framework / utility libraries
+        // Core JS frameworks
         'jquery', 'backbone', 'underscore', 'lodash',
         'bootstrap', 'popper',
-        'moment', 'flatpickr', 'pikaday',
-        'select2', 'chosen',
-        'd3', 'chart', 'highcharts',
-        'slick', 'swiper',
-        'tinymce', 'codemirror',
-        'requirejs', 'almond',
-        // React / webpack runtime chunks
+        'vue', 'preact', 'htmx', 'alpine',
+        // React / webpack output
         'react', 'react-dom', 'runtime',
+        'vendors', 'commons', 'manifest', 'workbox',
+        // Date / time
+        'moment', 'dayjs', 'luxon', 'flatpickr', 'pikaday',
+        'datetimepicker', 'datepicker', 'daterangepicker', 'litepicker',
+        'timeago',
+        // Select / autocomplete
+        'select2', 'chosen',
+        // Data visualisation
+        'd3', 'chart', 'highcharts', 'apexcharts', 'echarts',
+        'plotly', 'chartist', 'morris', 'frappe', 'nvd3', 'c3',
+        // Maps
+        'leaflet', 'mapbox', 'openlayers',
+        // Sliders / carousels
+        'slick', 'swiper', 'owl', 'flickity', 'glide', 'splide',
+        'bxslider', 'nivo', 'tiny-slider', 'revolution', 'unslider',
+        // Animation
+        'gsap', 'tweenmax', 'tweenlite', 'scrollmagic', 'animejs',
+        'aos', 'wow', 'velocity', 'anime', 'particles',
+        'typed', 'countup', 'odometer', 'vivus',
+        // Editors
+        'tinymce', 'codemirror', 'ckeditor', 'quill', 'summernote',
+        'trumbowyg', 'froala', 'ace', 'monaco',
+        'highlight', 'prism', 'medium-editor',
+        // Modals / notifications / tooltips
+        'sweetalert', 'sweetalert2', 'toastr', 'noty', 'notyf',
+        'alertify', 'izitoast', 'tippy',
+        'magnific', 'fancybox', 'photoswipe', 'lightgallery',
+        'colorbox', 'featherlight', 'glightbox', 'venobox',
+        'intro', 'shepherd',
+        // Tables / grids
+        'datatables', 'handsontable', 'tabulator',
+        // File upload
+        'dropzone', 'filepond', 'plupload', 'moxie', 'uppy',
+        // Forms / validation / masking
+        'parsley', 'inputmask', 'imask', 'cleave',
+        'intl-tel-input', 'autosize',
+        // Utility
+        'axios', 'clipboard', 'sortable', 'dragula', 'hammer',
+        'tether', 'modernizr', 'numeral', 'handlebars', 'mustache',
+        'dompurify', 'qrcode', 'jsbarcode', 'jszip', 'jspdf',
+        'fuse', 'lunr', 'zxcvbn', 'jsencrypt', 'sprintf',
+        'localforage', 'socket', 'sockjs',
+        // Polyfills
+        'polyfill', 'respond', 'html5shiv', 'html5shim',
+        'picturefill', 'es6-promise', 'whatwg-fetch',
+        // WordPress-specific bundled JS
+        'iris', 'farbtastic', 'thickbox', 'zeroclipboard',
+        // Module loaders
+        'requirejs', 'almond',
     ];
 
     /**
      * Exact filename stems (case-insensitive, extension stripped) that are
-     * known scaffold boilerplate or framework runtime files — not developer
-     * business logic. Applied to JS files only.
+     * known scaffold boilerplate, framework runtime, or build-tool config
+     * files — not developer business logic. Applied to JS files only.
      */
     private const SCAFFOLD_FILENAMES = [
         // Create React App boilerplate
         'reportwebvitals', 'setupTests', 'setuptests', 'setupproxy',
         'serviceworker', 'registerserviceworker',
-        // Common CRA / Vite / webpack entry boilerplate
+        // Service workers / PWA
+        'sw', 'workbox-sw', 'precache-manifest',
+        // Polyfill entry bundles
+        'polyfills', 'zone',
+        // Build tool configs (Grunt, Gulp, Rollup, …)
+        'gruntfile', 'gulpfile', 'rollup.config',
+        'webpack.mix',      // Laravel Mix
+        // Common bundler / test / lint configs
         'craco.config', 'vite.config', 'webpack.config',
         'babel.config', 'jest.config', 'postcss.config',
+        'jest.setup', 'vitest.config', 'vitest.setup',
+        'cypress.config', 'playwright.config',
+        'eslint.config', 'prettier.config',
+        'tsconfig', 'jsconfig',
+        // Next.js pages scaffold
+        '_app', '_document', '_error', 'middleware',
+        'next.config',
+        // Framework env files
+        'environment', 'environment.prod',
+        'svelte.config', 'nuxt.config', 'astro.config',
     ];
 
     /**
@@ -66,14 +153,44 @@ class GraphBuilder
      * libraries that appear verbatim inside plugin directories.
      */
     private const LIBRARY_PHP_FILENAMES = [
-        'class.phpmailer', 'class.smtp', 'class.pop3',     // PHPMailer v5
-        'phpmailer',                                        // PHPMailer v6+
-        'passwordhash', 'class-phpass',                    // phpass
-        'simplepie',                                        // SimplePie RSS
-        'markdown', 'markdownextra',                       // Markdown parsers
-        'mustache',                                         // Mustache.php
-        'idiorm', 'paris',                                  // ORM libs
-        'requests',                                         // Requests for PHP
+        // PHPMailer (v5 and v6)
+        'class.phpmailer', 'class.smtp', 'class.pop3',
+        'phpmailer', 'class-phpmailer', 'phpmailer-exception',
+        // Password hashing
+        'passwordhash', 'class-phpass',
+        // Feed / XML parsing
+        'simplepie', 'class-simplepie',
+        // Markdown parsers (very commonly bundled)
+        'markdown', 'markdownextra',
+        'parsedown', 'parsedown-extra',
+        // Templating
+        'mustache', 'twig',
+        // ORM / DB
+        'idiorm', 'paris', 'medoo',
+        // HTTP
+        'requests',
+        // PDF generation
+        'tcpdf', 'fpdf', 'fpdi', 'mpdf', 'dompdf',
+        // Image processing
+        'phpthumb', 'timthumb',
+        // YAML
+        'spyc',
+        // CSS pre-processing
+        'lessphp', 'scssphp',
+        // XSS sanitisation
+        'htmlpurifier', 'purifier',
+        // Authentication / JWT
+        'jwt', 'firebase-jwt', 'php-jwt',
+        'oauth', 'oauth2',
+        'recaptcha', 'class-recaptcha',
+        // Date
+        'carbon',
+        // WordPress plugin SDKs (commonly bundled as single bootstrap files)
+        'freemius',
+        'plugin-update-checker', 'puc',
+        'class-tgm-plugin-activation',
+        // CSS minification / JS minification helpers
+        'cssmin', 'jshrink', 'jsmin', 'minify',
     ];
 
     /**

@@ -255,4 +255,59 @@ class GraphBuilderTest extends TestCase
 
         $this->assertTrue($graph->nodes[0]->isLibrary);
     }
+
+    public function testBuild_NodeInPolyfillsDir_IsTaggedIsLibrary(): void
+    {
+        // js-dev/polyfills/ is a polyfill bundle directory — library code
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/theme/js-dev/polyfills/url-search-params.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_GruntfileJs_IsTaggedIsLibrary(): void
+    {
+        // Gruntfile.js is a build-tool config, not developer business logic
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/plugin/Gruntfile.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_ParsedownPhpFile_IsTaggedIsLibrary(): void
+    {
+        // Parsedown is the most commonly bundled PHP markdown library
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/includes/Parsedown.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_FreemiusDir_IsTaggedIsLibrary(): void
+    {
+        // Freemius SDK is a common commercial plugin monetisation library bundled in plugins
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/freemius/includes/class-freemius.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_GsapJsFile_IsTaggedIsLibrary(): void
+    {
+        // GSAP animation library bundled directly in plugin assets
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/plugin/assets/js/gsap.min.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
 }
