@@ -350,4 +350,54 @@ class JavaScriptVisitorTest extends TestCase
         // Just confirm no exception was thrown
         $this->assertTrue(true);
     }
+
+    // ── Relative imports ──────────────────────────────────────────────────────
+
+    public function testParse_WithRelativeImport_ToExistingFile_CreatesImportsEdge(): void
+    {
+        $dir       = sys_get_temp_dir() . '/jsv_rel_' . uniqid();
+        mkdir($dir);
+        $utilsPath  = $dir . '/utils.js';
+        $buttonPath = $dir . '/button.js';
+
+        file_put_contents($utilsPath, 'export function helper() { return 42; }');
+        file_put_contents($buttonPath, "import { helper } from './utils';\nfunction main() { helper(); }");
+
+        $this->visitor->parse(file_get_contents($buttonPath), $buttonPath);
+
+        $importsEdges = array_filter(
+            $this->collection->getAllEdges(),
+            static fn ($e) => $e->type === 'imports',
+        );
+
+        @unlink($utilsPath);
+        @unlink($buttonPath);
+        @rmdir($dir);
+
+        $this->assertNotEmpty($importsEdges, 'Expected an imports edge for relative import to existing file');
+    }
+
+    public function testParse_WithRelativeImport_ToNonExistentFile_NoEdge(): void
+    {
+        $this->parse("import { Foo } from './does-not-exist-xyz';");
+
+        $importsEdges = array_filter(
+            $this->collection->getAllEdges(),
+            static fn ($e) => $e->type === 'imports',
+        );
+
+        $this->assertEmpty($importsEdges, 'Expected no imports edge when target file does not exist');
+    }
+
+    public function testParse_WithRelativeCssImport_NoImportsEdge(): void
+    {
+        $this->parse("import './styles.css';");
+
+        $importsEdges = array_filter(
+            $this->collection->getAllEdges(),
+            static fn ($e) => $e->type === 'imports',
+        );
+
+        $this->assertEmpty($importsEdges, 'Expected no imports edge for CSS import');
+    }
 }

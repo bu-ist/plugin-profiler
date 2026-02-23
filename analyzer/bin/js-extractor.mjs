@@ -414,6 +414,10 @@ function walk(node, parent) {
       if (!src.startsWith('.') && !src.startsWith('/') && !/\.(css|scss|less|svg|png|jpg|json)$/.test(src)) {
         entities.push({ type: 'js_import', name: src, line: line(node), meta: { source: src } });
       }
+      // Relative imports = intra-plugin file dependencies (shown in Requirements view)
+      if (src.startsWith('.') && !/\.(css|scss|less|sass|svg|png|jpg|gif|woff|woff2|ttf|eot|ico|mp4|webm)$/.test(src)) {
+        entities.push({ type: 'js_relative_import', name: src, line: line(node), meta: { source: src } });
+      }
       break;
     }
 

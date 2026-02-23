@@ -24,6 +24,7 @@ use PluginProfiler\Graph\Node as GraphNode;
  *   gutenberg_block  — registerBlockType()
  *   wp_store         — @wordpress/data select/dispatch/subscribe store access
  *   js_import        — Third-party package imports (for dependency edges)
+ *   js_relative_import — Relative imports between plugin files → `imports` edge
  */
 class JavaScriptVisitor
 {
@@ -221,7 +222,52 @@ class JavaScriptVisitor
             case 'js_import':
                 // Package imports — informational only, no visual nodes (too noisy)
                 break;
+
+            case 'js_relative_import':
+                // Intra-plugin relative import: emit an `imports` edge from this file
+                // to the target file. The target node may not exist yet (files are
+                // processed sequentially); GraphBuilder silently drops unresolvable edges.
+                $targetPath = $this->resolveRelativeImport((string) ($meta['source'] ?? $name), $filePath);
+                if ($targetPath !== null) {
+                    $targetNodeId = GraphNode::sanitizeId('file_' . $targetPath);
+                    $this->addEdge($fileNodeId, $targetNodeId, 'imports', 'imports');
+                }
+                break;
         }
+    }
+
+    /**
+     * Resolve a relative JS import path (e.g. './utils', '../hooks/useFoo') to an
+     * absolute file path in the container, trying common JS/TS extensions.
+     * Returns null when the target cannot be found on disk.
+     */
+    private function resolveRelativeImport(string $src, string $fromFile): ?string
+    {
+        $dir = dirname($fromFile);
+
+        // Try the path as-is (already has an extension)
+        $direct = realpath($dir . '/' . $src);
+        if ($direct !== false) {
+            return $direct;
+        }
+
+        // Try appending common JS/TS extensions
+        foreach (['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'] as $ext) {
+            $candidate = realpath($dir . '/' . $src . $ext);
+            if ($candidate !== false) {
+                return $candidate;
+            }
+        }
+
+        // Try index files inside the named directory
+        foreach (['/index.js', '/index.jsx', '/index.ts', '/index.tsx'] as $suffix) {
+            $candidate = realpath($dir . '/' . $src . $suffix);
+            if ($candidate !== false) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

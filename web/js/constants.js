@@ -109,6 +109,7 @@ export const EDGE_VIEW_MODES = {
       'instantiates', 'calls',
       'includes', 'defines', 'has_method',
       'defines_component',           // React component structural definition
+      'imports',                     // JS module imports between plugin files
     ]),
   },
   data: {

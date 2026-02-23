@@ -490,6 +490,21 @@ async function main() {
 
   // Sidebar close button (delegated, since sidebar content is re-rendered)
   document.getElementById('sidebar')?.addEventListener('click', (e) => {
+    // Copy file path to clipboard when file-path button is clicked.
+    const copyBtn = e.target.closest('[data-copy-path]');
+    if (copyBtn) {
+      const path = copyBtn.dataset.copyPath;
+      navigator.clipboard.writeText(path).then(() => {
+        const savedHtml = copyBtn.innerHTML;
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.classList.replace('text-blue-400', 'text-green-400');
+        setTimeout(() => {
+          copyBtn.innerHTML = savedHtml;
+          copyBtn.classList.replace('text-green-400', 'text-blue-400');
+        }, 1500);
+      });
+      return;
+    }
     if (e.target.id === 'sidebar-close' || e.target.closest('#sidebar-close')) {
       closeSidebar();
     }

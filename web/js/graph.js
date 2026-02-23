@@ -27,6 +27,11 @@ const EDGE_STYLES = [
     selector: 'edge[type="instantiates"]',
     style:    { 'line-style': 'dotted', 'width': 2, 'line-color': '#2DD4BF', 'target-arrow-color': '#2DD4BF' },
   },
+  // JS module imports — dashed slate-blue (softer than class edges; JS file-to-file)
+  {
+    selector: 'edge[type="imports"]',
+    style:    { 'line-style': 'dashed', 'width': 1.5, 'line-color': '#818CF8', 'target-arrow-color': '#818CF8' },
+  },
   // WordPress hooks — dashed orange (orange-400)
   {
     selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',

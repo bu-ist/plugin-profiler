@@ -130,9 +130,11 @@ function buildSidebarHtml(data) {
   const language = JS_TYPES.has(data.type) ? 'javascript' : 'php';
 
   const connections = buildConnectionsHtml(data);
-  const vscodePath  = buildVsCodeLink(data);
-  // Display path: strip the /plugin container prefix for readability.
-  const displayFile = data.file?.replace(/^\/plugin\//, '') ?? data.file;
+  const copyPath    = buildCopyPath(data);
+  // Show absolute host path when available; otherwise strip the /plugin container prefix.
+  const displayFile = (copyPath && !copyPath.startsWith('/plugin'))
+    ? copyPath   // already includes :line suffix
+    : (data.file?.replace(/^\/plugin\//, '') ?? data.file) + (data.line ? `:${data.line}` : '');
   const sourceHtml = data.source_preview
     ? `<pre class="text-xs overflow-x-auto"><code class="language-${language}">${escapeHtml(data.source_preview)}</code></pre>`
     : '<p class="text-gray-400 text-xs italic">No source preview available.</p>';
@@ -161,9 +163,9 @@ function buildSidebarHtml(data) {
 
     <div class="text-xs text-gray-400 mb-3">
       <span class="text-gray-500">File:</span>
-      ${vscodePath
-        ? `<a href="${vscodePath}" class="text-blue-400 hover:underline break-all">${escapeHtml(displayFile)}:${data.line}</a>`
-        : `<span class="break-all">${escapeHtml(displayFile)}:${data.line}</span>`}
+      ${copyPath
+        ? `<button data-copy-path="${escapeHtml(copyPath)}" class="text-blue-400 hover:text-blue-300 break-all text-left cursor-pointer" title="Click to copy path to clipboard">${escapeHtml(displayFile)}</button>`
+        : `<span class="break-all">${escapeHtml(displayFile)}</span>`}
     </div>
 
     ${connections}
@@ -212,19 +214,22 @@ function buildConnectionsHtml(data) {
   </div>`;
 }
 
-function buildVsCodeLink(data) {
+/**
+ * Returns the absolute host-side path (with line number) ready to copy to clipboard,
+ * e.g. "/Users/foo/plugins/my-plugin/src/class-foo.php:42".
+ * Uses host_path from plugin metadata to remap container-internal /plugin/... paths.
+ * Returns null when no file path is available.
+ */
+function buildCopyPath(data) {
   if (!data.file) return null;
 
-  // File paths in graph-data.json are container-internal (e.g. /plugin/src/foo.php).
-  // When PLUGIN_PATH is set, graph-data.json carries host_path (e.g. /Users/…/bu-banners).
-  // Replace the /plugin prefix so the vscode:// URI opens the real file on the host.
   let filePath = data.file;
   const hostPath = _pluginData?.host_path;
   if (hostPath && filePath.startsWith('/plugin')) {
     filePath = hostPath.replace(/\/$/, '') + filePath.slice('/plugin'.length);
   }
 
-  return `vscode://file/${filePath}:${data.line || 0}`;
+  return data.line ? `${filePath}:${data.line}` : filePath;
 }
 
 /**
