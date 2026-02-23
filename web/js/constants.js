@@ -83,9 +83,11 @@ export const NODE_TYPES = {
 /**
  * EDGE_VIEW_MODES — preset edge-type filters for the view-mode toolbar buttons.
  *
- * "structure" shows code-organisation edges (how the code is assembled).
- * "behavior"  shows runtime edges (hooks, data, REST — what the code does).
- * "all"       shows everything (null set = no filtering).
+ * "requirements" shows code-dependency edges (inheritance, composition, file
+ *               includes) — what the code requires from other code.
+ * "data"        shows runtime data-flow edges (hooks, DB operations, REST,
+ *               AJAX, cross-language calls) — what the plugin does at runtime.
+ * "all"         shows everything (null set = no filtering).
  *
  * @type {Record<string, { label: string, edges: Set<string>|null }>}
  */
@@ -94,16 +96,16 @@ export const EDGE_VIEW_MODES = {
     label: 'All',
     edges: null,
   },
-  structure: {
-    label: 'Structure',
+  requirements: {
+    label: 'Requirements',
     edges: new Set([
       'extends', 'implements', 'uses_trait',
       'instantiates', 'calls',
       'includes', 'defines', 'has_method',
     ]),
   },
-  behavior: {
-    label: 'Behavior',
+  data: {
+    label: 'Data',
     edges: new Set([
       'registers_hook', 'triggers_hook',
       'reads_data', 'writes_data',

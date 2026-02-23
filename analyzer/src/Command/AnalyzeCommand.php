@@ -76,9 +76,14 @@ class AnalyzeCommand extends Command
         $allFiles = $scanner->scan($pluginPath);
         $output->writeln(sprintf('  Found %d files.', count($allFiles)));
 
-        // Step 2: Extract plugin metadata from main file
-        $mainFile = $scanner->identifyMainPluginFile($allFiles);
+        // Step 2: Extract plugin metadata from main file.
+        // For WordPress plugins: read the PHP file with "Plugin Name:" header.
+        // For WordPress themes: fall back to style.css which carries "Theme Name:".
+        $mainFile   = $scanner->identifyMainPluginFile($allFiles);
         $pluginMeta = $this->extractPluginHeader($mainFile);
+        if (empty($pluginMeta)) {
+            $pluginMeta = $this->extractThemeHeader($pluginPath);
+        }
 
         // Step 3: Parse
         $output->writeln('<comment>Parsing plugin...</comment>');
@@ -257,6 +262,41 @@ class AnalyzeCommand extends Command
         $fields = [];
         $map    = [
             'name'        => 'Plugin Name',
+            'version'     => 'Version',
+            'description' => 'Description',
+        ];
+
+        foreach ($map as $key => $header) {
+            if (preg_match('/' . preg_quote($header, '/') . '\s*:\s*(.+)/i', $content, $m)) {
+                $fields[$key] = trim($m[1]);
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Extract WordPress theme header fields from style.css in the theme root.
+     * Themes use "Theme Name:" rather than "Plugin Name:", but share "Version:"
+     * and "Description:" with the plugin format.
+     *
+     * @return array<string, string>
+     */
+    private function extractThemeHeader(string $pluginPath): array
+    {
+        $styleCss = rtrim($pluginPath, '/\\') . DIRECTORY_SEPARATOR . 'style.css';
+        if (!is_readable($styleCss)) {
+            return [];
+        }
+
+        $content = file_get_contents($styleCss, false, null, 0, 8192);
+        if ($content === false) {
+            return [];
+        }
+
+        $fields = [];
+        $map    = [
+            'name'        => 'Theme Name',
             'version'     => 'Version',
             'description' => 'Description',
         ];

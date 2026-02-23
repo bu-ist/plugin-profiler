@@ -30,12 +30,12 @@ const EDGE_STYLES = [
   // WordPress hooks — dashed orange
   {
     selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',
-    style:    { 'line-style': 'dashed', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
   },
   // Hook trigger to handler — solid orange
   {
     selector: 'edge[type="triggers_handler"]',
-    style:    { 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
   },
   // Data reads — solid purple
   {
@@ -50,17 +50,17 @@ const EDGE_STYLES = [
   // Outbound HTTP — red
   {
     selector: 'edge[type="http_request"]',
-    style:    { 'line-color': '#EF4444', 'target-arrow-color': '#EF4444' },
+    style:    { 'width': 2, 'line-color': '#EF4444', 'target-arrow-color': '#EF4444' },
   },
   // Block rendering and asset enqueueing — dotted pink
   {
     selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
-    style:    { 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+    style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
   },
   // Registration edges — dashed green
   {
     selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
-    style:    { 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
+    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
   },
   // Cross-language JS→PHP edges — solid/dashed pink (the tool's unique signal)
   {
@@ -164,9 +164,9 @@ function buildStylesheet() {
     {
       selector: 'edge',
       style: {
-        'width':                   1.5,
-        'line-color':              '#475569',
-        'target-arrow-color':      '#475569',
+        'width':                   2,
+        'line-color':              '#64748B',
+        'target-arrow-color':      '#64748B',
         'target-arrow-shape':      'triangle',
         'curve-style':             'bezier',
         // Edge labels are hidden by default — they create visual noise at

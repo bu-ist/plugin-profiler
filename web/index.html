@@ -101,11 +101,11 @@
         <option value="grid">Grid</option>
       </select>
 
-      <!-- View mode: All / Structure / Behavior -->
-      <div id="view-mode-btns" class="flex rounded overflow-hidden border border-gray-600 text-xs" title="Filter edges by relationship type">
-        <button data-view="all"       class="view-mode-btn px-2 py-1 bg-blue-600 text-white">All</button>
-        <button data-view="structure" class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600">Structure</button>
-        <button data-view="behavior"  class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600">Behavior</button>
+      <!-- View mode: All / Requirements / Data flow -->
+      <div id="view-mode-btns" class="flex rounded overflow-hidden border border-gray-600 text-xs">
+        <button data-view="all"          class="view-mode-btn px-2 py-1 bg-blue-600 text-white" title="Show all relationship edges">All</button>
+        <button data-view="requirements" class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600" title="Code-dependency edges: inheritance, composition, file includes">Requirements</button>
+        <button data-view="data"         class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600" title="Data-flow edges: hooks, DB reads/writes, REST calls, AJAX">Data flow</button>
       </div>
 
       <!-- Collapse/Expand all namespace groups -->

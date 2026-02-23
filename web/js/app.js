@@ -177,13 +177,17 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   banner.innerHTML = `
     <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
     <button id="show-all-link" class="text-blue-400 hover:text-blue-300 underline whitespace-nowrap">Show all →</button>
-    <button class="ml-1 text-slate-500 hover:text-white font-bold" onclick="this.parentElement.remove()">✕</button>
+    <button id="banner-dismiss" class="ml-1 text-slate-500 hover:text-white font-bold leading-none" title="Dismiss">✕</button>
   `;
   layout.prepend(banner);
 
   document.getElementById('show-all-link')?.addEventListener('click', () => {
     _isFocused = false;
     switchView();
+  });
+
+  document.getElementById('banner-dismiss')?.addEventListener('click', () => {
+    banner.remove();
   });
 }
 
@@ -433,11 +437,14 @@ async function main() {
   // initialised. The extension is registered in graph.js; the API is available
   // via _cy.expandCollapse('get') after the first call to _cy.expandCollapse({}).
   document.getElementById('collapse-btn')?.addEventListener('click', () => {
-    const api       = _cy.expandCollapse('get');
-    const hasGroups = _cy.nodes('[type = "namespace"], [type = "dir"]').length > 0;
-    if (!api || !hasGroups) return;
+    const api        = _cy.expandCollapse('get');
+    const groupNodes = _cy.nodes('[type = "namespace"], [type = "dir"]');
+    if (!api || !groupNodes.length) return;
 
-    const anyCollapsed = _cy.nodes(':parent').some((n) => api.isCollapsed(n));
+    // Use type-based selector rather than :parent — collapsed groups have no
+    // visible children so :parent would not match them, making the toggle
+    // unable to detect the collapsed state.
+    const anyCollapsed = groupNodes.some((n) => api.isCollapsed(n));
     if (anyCollapsed) {
       api.expandAll();
       document.getElementById('collapse-btn').textContent = '⊟ Groups';
