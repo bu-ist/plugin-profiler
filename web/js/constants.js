@@ -80,6 +80,39 @@ export const NODE_TYPES = {
   dir:              { color: '#0F172A', shape: 'round-rectangle', badge: 'bg-slate-700' },
 };
 
+/**
+ * EDGE_VIEW_MODES — preset edge-type filters for the view-mode toolbar buttons.
+ *
+ * "structure" shows code-organisation edges (how the code is assembled).
+ * "behavior"  shows runtime edges (hooks, data, REST — what the code does).
+ * "all"       shows everything (null set = no filtering).
+ *
+ * @type {Record<string, { label: string, edges: Set<string>|null }>}
+ */
+export const EDGE_VIEW_MODES = {
+  all: {
+    label: 'All',
+    edges: null,
+  },
+  structure: {
+    label: 'Structure',
+    edges: new Set([
+      'extends', 'implements', 'uses_trait',
+      'instantiates', 'calls',
+      'includes', 'defines', 'has_method',
+    ]),
+  },
+  behavior: {
+    label: 'Behavior',
+    edges: new Set([
+      'registers_hook', 'triggers_hook',
+      'reads_data', 'writes_data',
+      'registers',
+      'calls_endpoint', 'calls_ajax_handler', 'js_block_matches_php',
+    ]),
+  },
+};
+
 /** Return the Cytoscape fill colour for a node type (fallback: gray). */
 export const nodeColor = (type) => NODE_TYPES[type]?.color ?? '#6B7280';
 

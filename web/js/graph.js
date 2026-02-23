@@ -198,6 +198,11 @@ function buildStylesheet() {
       selector: 'edge.dimmed',
       style: { 'opacity': 0.05 },
     },
+    // ── Edge view-mode filter — hide edges not in the active mode ─────────
+    {
+      selector: 'edge.view-hidden',
+      style: { 'display': 'none' },
+    },
     // ── Selection / highlight ring ────────────────────────────────────────
     {
       selector: 'node:selected',
