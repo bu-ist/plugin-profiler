@@ -8,6 +8,8 @@ class Node
 {
     public ?string $description = null;
     public ?string $sourcePreview = null;
+    /** True when the node's file is from a bundled library directory (lib/, libs/, etc.). */
+    public bool $isLibrary = false;
 
     public function __construct(
         public readonly string $id,

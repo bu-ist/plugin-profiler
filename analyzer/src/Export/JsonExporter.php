@@ -237,6 +237,7 @@ class JsonExporter
             'metadata'       => $this->normalizeMetadata($node->metadata),
             'docblock'       => $node->docblock,
             'description'    => $node->description,
+            'is_library'     => $node->isLibrary,
             'source_preview' => $node->sourcePreview !== null
                 ? $this->sanitizeUtf8($node->sourcePreview)
                 : null,

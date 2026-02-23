@@ -11,6 +11,7 @@ import { nodeBadge } from './constants.js';
 let _cy = null;
 let _activeTypes = new Set();
 let _allNodes = null;  // full node list (may exceed rendered set)
+let _hideLibrary = false;
 
 export function initSearch(cy, allNodes = null) {
   _cy = cy;
@@ -23,6 +24,17 @@ export function initSearch(cy, allNodes = null) {
   populateAutocomplete();
   bindSearchInput();
   bindKeyboardShortcuts();
+}
+
+/**
+ * Toggle the library-code filter.
+ * When enabled, nodes with data.is_library === true are hidden.
+ * Returns the new state (true = hiding library nodes).
+ */
+export function toggleLibraryFilter() {
+  _hideLibrary = !_hideLibrary;
+  applyFilters();
+  return _hideLibrary;
 }
 
 function bindSearchInput() {
@@ -69,7 +81,7 @@ function toggleType(type, btn) {
   applyFilters();
 }
 
-function applyFilters() {
+export function applyFilters() {
   if (!_cy) return;
 
   const query = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
@@ -80,8 +92,9 @@ function applyFilters() {
       const label = (node.data('label') || '').toLowerCase();
       const typeVisible = _activeTypes.has(type);
       const searchMatch = !query || label.includes(query);
+      const libraryVisible = !_hideLibrary || !node.data('is_library');
 
-      if (typeVisible && searchMatch) {
+      if (typeVisible && searchMatch && libraryVisible) {
         node.style('display', 'element');
         node.removeClass('dimmed');
       } else {

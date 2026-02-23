@@ -1,7 +1,7 @@
 import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
-import { initSearch } from './search.js';
+import { initSearch, toggleLibraryFilter } from './search.js';
 import { EDGE_VIEW_MODES } from './constants.js';
 import { escapeHtml } from './utils.js';
 
@@ -388,6 +388,11 @@ async function main() {
   updateFocusButton(focused.focusCount, focused.totalCount);
   showStatusBanner(focused.focusCount, focused.totalCount, true);
 
+  // Show the Dev-only filter button only when the graph contains library nodes
+  const hasLibraryNodes = (graphData.nodes || []).some(n => n.data?.is_library === true);
+  const libBtn = document.getElementById('lib-filter-btn');
+  if (libBtn && hasLibraryNodes) libBtn.classList.remove('hidden');
+
   // Focus/Show-all toggle button
   document.getElementById('focus-btn')?.addEventListener('click', () => {
     _isFocused = !_isFocused;
@@ -430,6 +435,16 @@ async function main() {
       api.collapseAll();
       document.getElementById('collapse-btn').textContent = '⊞ Groups';
     }
+  });
+
+  // Dev-only / library filter button
+  document.getElementById('lib-filter-btn')?.addEventListener('click', () => {
+    const hiding = toggleLibraryFilter();
+    const btn = document.getElementById('lib-filter-btn');
+    const lbl = document.getElementById('lib-filter-label');
+    if (lbl) lbl.textContent = hiding ? '⚙ Dev only (active)' : '⚙ Dev only';
+    if (btn) btn.classList.toggle('bg-blue-700', hiding);
+    if (btn) btn.classList.toggle('bg-gray-700', !hiding);
   });
 
   // Zoom controls — zoom toward the center of the viewport

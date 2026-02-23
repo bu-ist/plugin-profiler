@@ -125,4 +125,57 @@ class GraphBuilderTest extends TestCase
         $this->assertCount(0, $graph->nodes);
         $this->assertCount(0, $graph->edges);
     }
+
+    // ── Library detection ─────────────────────────────────────────────────────
+
+    public function testBuild_NodeInLibDir_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/lib/ext.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInLibsSubdir_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/includes/libs/jquery.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInThirdPartyDir_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/third-party/foo.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInDeveloperDir_IsNotTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/includes/class-plugin.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeWithLibInFilename_IsNotTaggedIsLibrary(): void
+    {
+        // "lib" in a filename (not a directory segment) should not trigger the flag
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/src/library-loader.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
 }
