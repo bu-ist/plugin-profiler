@@ -77,7 +77,8 @@
         type="search"
         list="node-labels"
         placeholder="Search nodes… (/)"
-        class="bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-1 text-sm w-52 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        aria-label="Search nodes"
+        class="bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-1 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-400"
         autocomplete="off"
       />
       <datalist id="node-labels"></datalist>
@@ -102,10 +103,30 @@
       </select>
 
       <!-- View mode: All / Requirements / Data flow -->
-      <div id="view-mode-btns" class="flex rounded overflow-hidden border border-gray-600 text-xs">
-        <button data-view="all"          class="view-mode-btn px-2 py-1 bg-blue-600 text-white" title="Show all relationship edges">All</button>
-        <button data-view="requirements" class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600" title="Code-dependency edges: inheritance, composition, file includes">Requirements</button>
-        <button data-view="data"         class="view-mode-btn px-2 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white border-l border-gray-600" title="Data-flow edges: hooks, DB reads/writes, REST calls, AJAX">Data flow</button>
+      <div
+        id="view-mode-btns"
+        class="flex rounded overflow-hidden border border-gray-600 text-xs"
+        role="group"
+        aria-label="Edge view mode"
+      >
+        <button
+          data-view="all"
+          class="view-mode-btn px-2 py-1 bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
+          title="Show all relationship edges"
+          aria-pressed="true"
+        >All</button>
+        <button
+          data-view="requirements"
+          class="view-mode-btn px-2 py-1 bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200 border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
+          title="Structural edges: inheritance, composition, function calls, file includes — what the code requires to load"
+          aria-pressed="false"
+        >Requirements</button>
+        <button
+          data-view="data"
+          class="view-mode-btn px-2 py-1 bg-gray-700 text-orange-300 hover:bg-gray-600 hover:text-orange-200 border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
+          title="Runtime edges: hooks, DB reads/writes, REST, AJAX, HTTP — what the plugin does at runtime"
+          aria-pressed="false"
+        >Data flow</button>
       </div>
 
       <!-- Collapse/Expand all namespace groups -->

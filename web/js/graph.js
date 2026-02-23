@@ -17,63 +17,73 @@ import { NODE_TYPES } from './constants.js';
 //   selector string → { partial style overrides }
 
 const EDGE_STYLES = [
-  // Inheritance — solid blue
+  // Inheritance — solid blue (blue-400: bright, readable on dark bg)
   {
     selector: 'edge[type="extends"], edge[type="implements"], edge[type="uses_trait"]',
-    style:    { 'line-style': 'solid', 'width': 2, 'line-color': '#3B82F6', 'target-arrow-color': '#3B82F6' },
+    style:    { 'line-style': 'solid', 'width': 2.5, 'line-color': '#60A5FA', 'target-arrow-color': '#60A5FA' },
   },
   // Instantiation — dotted teal (weaker dependency than inheritance)
   {
     selector: 'edge[type="instantiates"]',
-    style:    { 'line-style': 'dotted', 'width': 1.5, 'line-color': '#14B8A6', 'target-arrow-color': '#14B8A6' },
+    style:    { 'line-style': 'dotted', 'width': 2, 'line-color': '#2DD4BF', 'target-arrow-color': '#2DD4BF' },
   },
-  // WordPress hooks — dashed orange
+  // WordPress hooks — dashed orange (orange-400)
   {
     selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
   },
-  // Hook trigger to handler — solid orange
+  // Hook trigger to handler — solid orange (orange-400)
   {
     selector: 'edge[type="triggers_handler"]',
-    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#F97316', 'target-arrow-color': '#F97316' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
   },
-  // Data reads — solid purple
+  // Data reads — solid purple (purple-400)
   {
     selector: 'edge[type="reads_data"]',
-    style:    { 'width': 2.5, 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
+    style:    { 'width': 2.5, 'line-color': '#C084FC', 'target-arrow-color': '#C084FC' },
   },
   // Data writes — dashed purple (writes are "heavier" than reads)
   {
     selector: 'edge[type="writes_data"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#A855F7', 'target-arrow-color': '#A855F7' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#C084FC', 'target-arrow-color': '#C084FC' },
   },
-  // Outbound HTTP — red
+  // Outbound HTTP — red (red-400)
   {
     selector: 'edge[type="http_request"]',
-    style:    { 'width': 2, 'line-color': '#EF4444', 'target-arrow-color': '#EF4444' },
+    style:    { 'width': 2.5, 'line-color': '#F87171', 'target-arrow-color': '#F87171' },
   },
-  // Block rendering and asset enqueueing — dotted pink
+  // Block rendering and asset enqueueing — dotted pink (pink-400)
   {
     selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
-    style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
   },
-  // Registration edges — dashed green
+  // Registration edges — dashed green (green-400)
   {
     selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
-    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#22C55E', 'target-arrow-color': '#22C55E' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80' },
+  },
+  // JS hook usage (file → js_hook) — same orange family as PHP hooks
+  {
+    selector: 'edge[type="uses_hook"]',
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
+  },
+  // JS apiFetch calls (file → js_api_call node) — green, same REST family
+  {
+    selector: 'edge[type="js_api_call"]',
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80' },
   },
   // Cross-language JS→PHP edges — solid/dashed pink (the tool's unique signal)
   {
     selector: 'edge[type="calls_endpoint"]',
-    style:    { 'width': 2, 'line-style': 'solid', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
   },
   {
     selector: 'edge[type="calls_ajax_handler"]',
-    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
   },
   {
     selector: 'edge[type="js_block_matches_php"]',
-    style:    { 'width': 1.5, 'line-style': 'dotted', 'line-color': '#EC4899', 'target-arrow-color': '#EC4899' },
+    style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
   },
 ];
 
@@ -164,10 +174,11 @@ function buildStylesheet() {
     {
       selector: 'edge',
       style: {
-        'width':                   2,
-        'line-color':              '#64748B',
-        'target-arrow-color':      '#64748B',
+        'width':                   2.5,
+        'line-color':              '#94A3B8',  // slate-400 — visible on dark bg
+        'target-arrow-color':      '#94A3B8',
         'target-arrow-shape':      'triangle',
+        'arrow-scale':             2,          // 2× default arrowhead size
         'curve-style':             'bezier',
         // Edge labels are hidden by default — they create visual noise at
         // normal zoom. They become visible when an edge is selected.
@@ -185,7 +196,7 @@ function buildStylesheet() {
     // ── Edge selected: reveal label, thicken stroke ───────────────────────
     {
       selector: 'edge:selected',
-      style: { 'label': 'data(label)', 'width': 2.5 },
+      style: { 'label': 'data(label)', 'width': 3.5 },
     },
     // ── Per-type edge styles ──────────────────────────────────────────────
     ...EDGE_STYLES,

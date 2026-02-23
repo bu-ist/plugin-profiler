@@ -98,18 +98,36 @@ export const EDGE_VIEW_MODES = {
   },
   requirements: {
     label: 'Requirements',
+    // Structural / load-time dependency edges: what code must exist for this
+    // code to run? Inheritance, composition, function calls, file includes.
     edges: new Set([
       'extends', 'implements', 'uses_trait',
       'instantiates', 'calls',
       'includes', 'defines', 'has_method',
+      'defines_component',           // React component structural definition
     ]),
   },
   data: {
     label: 'Data',
+    // Runtime / event-driven edges: what happens when WordPress fires events
+    // and data moves through the system?
     edges: new Set([
-      'registers_hook', 'triggers_hook',
+      // WordPress hook system
+      'registers_hook', 'triggers_hook', 'triggers_handler', 'js_registers_hook',
+      // Database / storage
       'reads_data', 'writes_data',
+      // WordPress runtime registrations (all happen at init / admin_init)
       'registers',
+      'registers_rest', 'registers_shortcode', 'registers_page', 'registers_ajax',
+      'registers_post_type', 'registers_taxonomy',
+      'schedules_cron',
+      // Outbound HTTP
+      'http_request',
+      // Block rendering and asset enqueueing
+      'renders_block', 'enqueues_script',
+      // JS WordPress hooks and API calls
+      'uses_hook', 'js_api_call',
+      // Cross-language JS → PHP calls
       'calls_endpoint', 'calls_ajax_handler', 'js_block_matches_php',
     ]),
   },

@@ -420,13 +420,19 @@ async function main() {
     if (mode === _viewMode) return;
     _viewMode = mode;
 
-    // Update button highlight
+    // Update button highlight — each mode has its own active/inactive colour pair
+    // so "Requirements" stays blue and "Data flow" stays orange at a glance.
+    const BTN_COLORS = {
+      all:          { active: ['bg-blue-600',   'text-white'],        inactive: ['bg-gray-700', 'text-gray-300'] },
+      requirements: { active: ['bg-blue-700',   'text-white'],        inactive: ['bg-gray-700', 'text-blue-300'] },
+      data:         { active: ['bg-orange-700', 'text-white'],        inactive: ['bg-gray-700', 'text-orange-300'] },
+    };
     document.querySelectorAll('.view-mode-btn').forEach((b) => {
-      const active = b.dataset.view === mode;
-      b.classList.toggle('bg-blue-600', active);
-      b.classList.toggle('text-white',  active);
-      b.classList.toggle('bg-gray-700', !active);
-      b.classList.toggle('text-gray-400', !active);
+      const isActive = b.dataset.view === mode;
+      const colors   = BTN_COLORS[b.dataset.view] ?? BTN_COLORS.all;
+      b.classList.remove(...colors.active, ...colors.inactive);
+      b.classList.add(...(isActive ? colors.active : colors.inactive));
+      b.setAttribute('aria-pressed', String(isActive));
     });
 
     applyViewMode();
