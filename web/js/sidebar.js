@@ -43,7 +43,11 @@ export function openSidebar(nodeData) {
   // Re-highlight code after rendering
   if (window.Prism) {
     sidebar.querySelectorAll('code[class*="language-"]').forEach((el) => {
-      Prism.highlightElement(el);
+      try {
+        Prism.highlightElement(el);
+      } catch (_) {
+        // Prism can fail on certain PHP constructs — leave as plain text
+      }
     });
   }
 
