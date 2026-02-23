@@ -20,23 +20,51 @@ class OllamaClient implements LLMClientInterface
 You are a WordPress plugin architecture expert. You will receive metadata
 about PHP and JavaScript entities extracted from a WordPress plugin via static analysis.
 
-For each entity, write a clear 2-3 sentence description explaining:
-1. What this entity does
-2. How it fits into the plugin's architecture
-3. Any important side effects, dependencies, or external interactions
+For each entity, write a clear 1-2 sentence description explaining what it does
+and how it fits into the plugin's architecture. Be concise and precise.
 
-Use precise technical language. Reference specific hook names, class
-relationships, and data operations mentioned in the metadata. Do not
-speculate about behavior not evident from the metadata.
+IMPORTANT: Respond ONLY with a valid JSON object. The format must be:
+{"entity_id_1": "Description here.", "entity_id_2": "Description here."}
 
-Respond with a JSON object mapping entity IDs to descriptions.
+Use the exact entity IDs provided in the input as the JSON keys.
+Do not wrap the JSON in markdown code fences or any other text.
 PROMPT;
 
     public function __construct(
         private readonly string $ollamaHost,
         private readonly string $model,
-        private readonly int $timeout = 120,
+        private readonly int $timeout = 300,
     ) {
+    }
+
+    public function generateText(string $prompt): ?string
+    {
+        $payload = json_encode([
+            'model'    => $this->model,
+            'stream'   => false,
+            'messages' => [
+                ['role' => 'user', 'content' => $prompt],
+            ],
+        ]);
+
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Content-Type: application/json\r\n",
+                'content'       => $payload,
+                'timeout'       => $this->timeout,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        $responseRaw = @file_get_contents($this->ollamaHost . '/api/chat', false, $context);
+        if ($responseRaw === false) {
+            return null;
+        }
+
+        $response = json_decode($responseRaw, true);
+
+        return is_array($response) ? ($response['message']['content'] ?? null) : null;
     }
 
     public function generateDescriptions(array $entityBatch): array
@@ -85,11 +113,38 @@ PROMPT;
         $cleaned = trim($cleaned ?? $raw);
 
         // Extract JSON object from response
-        if (preg_match('/\{.*\}/s', $cleaned, $m)) {
-            $decoded = json_decode($m[0], true);
-            if (is_array($decoded)) {
-                return array_filter($decoded, 'is_string');
+        if (!preg_match('/\{.*\}/s', $cleaned, $m)) {
+            fwrite(STDERR, "Warning: Failed to parse JSON from Ollama response\n");
+
+            return [];
+        }
+
+        $decoded = json_decode($m[0], true);
+        if (!is_array($decoded)) {
+            fwrite(STDERR, "Warning: Failed to parse JSON from Ollama response\n");
+
+            return [];
+        }
+
+        // Primary format: {"entity_id": "description string", ...}
+        $flat = array_filter($decoded, 'is_string');
+        if (!empty($flat)) {
+            return $flat;
+        }
+
+        // Fallback format: {"entity_ids": [...], "descriptions": [...]}
+        // Some smaller models return parallel arrays instead of a flat map.
+        if (isset($decoded['entity_ids'], $decoded['descriptions']) &&
+            is_array($decoded['entity_ids']) && is_array($decoded['descriptions'])
+        ) {
+            $result = [];
+            foreach ($decoded['entity_ids'] as $i => $id) {
+                if (isset($decoded['descriptions'][$i]) && is_string($id) && is_string($decoded['descriptions'][$i])) {
+                    $result[$id] = $decoded['descriptions'][$i];
+                }
             }
+
+            return $result;
         }
 
         fwrite(STDERR, "Warning: Failed to parse JSON from Ollama response\n");

@@ -52,6 +52,20 @@ PROMPT;
         return new self($apiKey, $baseUrl, $model, $timeout);
     }
 
+    public function generateText(string $prompt): ?string
+    {
+        $payload = json_encode([
+            'model'    => $this->model,
+            'messages' => [
+                ['role' => 'user', 'content' => $prompt],
+            ],
+        ]);
+
+        $result = $this->postWithRetry($this->baseUrl . 'chat/completions', $payload);
+
+        return $result !== null ? ($result['choices'][0]['message']['content'] ?? null) : null;
+    }
+
     public function generateDescriptions(array $entityBatch): array
     {
         $payload = json_encode([

@@ -13,4 +13,12 @@ interface LLMClientInterface
      * @return array<string, string>  entity_id => description
      */
     public function generateDescriptions(array $entityBatch): array;
+
+    /**
+     * Generate a free-form text response for a single prompt.
+     * Used for tasks like plugin summaries that don't fit the entity-batch pattern.
+     *
+     * Returns null on failure.
+     */
+    public function generateText(string $prompt): ?string;
 }

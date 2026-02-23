@@ -54,6 +54,70 @@ class DescriptionGenerator
     }
 
     /**
+     * Generate a high-level technical summary of the plugin architecture.
+     *
+     * Sends one final LLM request after all entity descriptions are generated.
+     * Uses a compact manifest of entity types, counts, and a sample of
+     * existing descriptions as context.
+     *
+     * Returns the summary string, or null if the LLM call fails.
+     */
+    public function generateSummary(Graph $graph): ?string
+    {
+        $plugin = $graph->plugin;
+
+        // Build a compact manifest of entity types and counts
+        $typeCounts = [];
+        foreach ($graph->nodes as $node) {
+            $typeCounts[$node->type] = ($typeCounts[$node->type] ?? 0) + 1;
+        }
+        arsort($typeCounts);
+
+        // Include up to 20 representative descriptions (prefer classes/functions)
+        $samples  = [];
+        $priority = ['class', 'interface', 'function', 'rest_endpoint', 'ajax_handler', 'hook', 'data_source'];
+        foreach ($priority as $type) {
+            foreach ($graph->nodes as $node) {
+                if ($node->type === $type && !empty($node->description)) {
+                    $samples[] = "[{$node->type}] {$node->label}: {$node->description}";
+                    if (count($samples) >= 20) {
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        $contextJson = json_encode([
+            'plugin_name'         => $plugin->name,
+            'plugin_version'      => $plugin->version,
+            'entity_counts'       => $typeCounts,
+            'total_nodes'         => count($graph->nodes),
+            'total_edges'         => count($graph->edges),
+            'sample_descriptions' => $samples,
+        ], JSON_UNESCAPED_UNICODE);
+
+        $prompt = <<<PROMPT
+You are a WordPress plugin architecture expert. Based on the JSON data below,
+write a 3-5 paragraph technical overview of this plugin for a senior WordPress developer.
+Cover: purpose, main architectural components, WordPress integrations (hooks, REST endpoints,
+data storage), and any notable patterns or design decisions. Plain prose only — no JSON,
+no bullet lists, no headings.
+
+{$contextJson}
+PROMPT;
+
+        try {
+            $text = $this->client->generateText($prompt);
+        } catch (\Throwable $e) {
+            fwrite(STDERR, "Warning: Plugin summary generation failed: {$e->getMessage()}\n");
+
+            return null;
+        }
+
+        return ($text !== null && strlen($text) > 50) ? trim($text) : null;
+    }
+
+    /**
      * Build a metadata payload for a single entity suitable for LLM prompting.
      *
      * @return array<string, mixed>

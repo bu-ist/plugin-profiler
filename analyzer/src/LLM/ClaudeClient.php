@@ -36,6 +36,21 @@ PROMPT;
     ) {
     }
 
+    public function generateText(string $prompt): ?string
+    {
+        $payload = json_encode([
+            'model'      => $this->model,
+            'max_tokens' => 2048,
+            'messages'   => [
+                ['role' => 'user', 'content' => $prompt],
+            ],
+        ]);
+
+        $result = $this->postWithRetry($payload);
+
+        return $result !== null ? ($result['content'][0]['text'] ?? null) : null;
+    }
+
     public function generateDescriptions(array $entityBatch): array
     {
         $payload = json_encode([
@@ -109,8 +124,9 @@ PROMPT;
         }
 
         if (isset($decoded['error'])) {
-            $msg = $decoded['error']['message'] ?? 'Unknown error';
-            fwrite(STDERR, "Warning: Claude API error: $msg\n");
+            $type = $decoded['error']['type'] ?? 'unknown';
+            $msg  = $decoded['error']['message'] ?? 'Unknown error';
+            fwrite(STDERR, "Warning: Claude API error [{$type}]: $msg\n");
             if ($attempt === 0) {
                 return $this->postWithRetry($payload, 1);
             }
@@ -127,14 +143,50 @@ PROMPT;
         $cleaned = preg_replace('/\s*```$/m', '', $cleaned ?? $raw);
         $cleaned = trim($cleaned ?? $raw);
 
-        if (preg_match('/\{.*\}/s', $cleaned, $m)) {
-            $decoded = json_decode($m[0], true);
-            if (is_array($decoded)) {
-                return array_filter($decoded, 'is_string');
+        if (!preg_match('/\{.*\}/s', $cleaned, $m)) {
+            fwrite(STDERR, "Warning: Failed to parse JSON from Claude response\n");
+            fwrite(STDERR, "  Raw (first 300 chars): " . substr($raw, 0, 300) . "\n");
+
+            return [];
+        }
+
+        $decoded = json_decode($m[0], true);
+        if (!is_array($decoded)) {
+            fwrite(STDERR, "Warning: Failed to parse JSON from Claude response\n");
+
+            return [];
+        }
+
+        // Case 1 — standard flat map: {"entity_id": "description text"}
+        $flat = array_filter($decoded, 'is_string');
+        if (!empty($flat)) {
+            return $flat;
+        }
+
+        // Case 2 — nested per-entity objects: {"entity_id": {"description": "text"}}
+        // Older Claude models (haiku-20240307) return this shape.
+        $nested = [];
+        foreach ($decoded as $key => $val) {
+            if (is_string($key) && is_array($val) && is_string($val['description'] ?? null)) {
+                $nested[$key] = $val['description'];
+            }
+        }
+        if (!empty($nested)) {
+            return $nested;
+        }
+
+        // Case 3 — single wrapper key: {"descriptions": {"entity_id": "text"}}
+        foreach ($decoded as $val) {
+            if (is_array($val)) {
+                $inner = array_filter($val, 'is_string');
+                if (!empty($inner)) {
+                    return $inner;
+                }
             }
         }
 
         fwrite(STDERR, "Warning: Failed to parse JSON from Claude response\n");
+        fwrite(STDERR, "  Raw (first 300 chars): " . substr($raw, 0, 300) . "\n");
 
         return [];
     }
