@@ -126,8 +126,14 @@ class AnalyzeCommand extends Command
 
         // Step 4b: Build graph
         $output->writeln('<comment>Building graph...</comment>');
+        // Prefer the WordPress "Plugin Name:" header. When absent (non-WP codebase),
+        // use the original host-side directory name so the UI shows something
+        // meaningful instead of the generic container mount point "/plugin".
+        $friendlyName = $pluginMeta['name']
+            ?? ($hostPath !== '' ? basename($hostPath) : basename($pluginPath));
+
         $meta = new PluginMetadata(
-            name: $pluginMeta['name'] ?? basename($pluginPath),
+            name: $friendlyName,
             version: $pluginMeta['version'] ?? '0.0.0',
             description: $pluginMeta['description'] ?? '',
             mainFile: $mainFile !== null ? basename($mainFile) : '',
@@ -180,6 +186,15 @@ class AnalyzeCommand extends Command
                 });
                 $output->writeln('');
                 $output->writeln(sprintf('  Done. %d entities described.', $totalNodes));
+
+                $output->write('  Generating plugin overview…');
+                $summary = $generator->generateSummary($graph);
+                if ($summary !== null) {
+                    $graph->aiSummary = $summary;
+                    $output->writeln(' Done.');
+                } else {
+                    $output->writeln(' Skipped (no descriptions available or LLM unavailable).');
+                }
             }
         }
 

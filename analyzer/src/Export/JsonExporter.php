@@ -67,6 +67,7 @@ class JsonExporter
                 'host_path'        => $graph->plugin->hostPath,
                 'php_files'        => $graph->plugin->phpFiles,
                 'js_files'         => $graph->plugin->jsFiles,
+                'summary'          => $graph->aiSummary,
             ],
             // Compound nodes come first so Cytoscape can resolve parent references
             'nodes' => [
@@ -87,7 +88,8 @@ class JsonExporter
 
         $json = json_encode(
             $data,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR,
         );
 
         file_put_contents($outputPath, $json);

@@ -8,6 +8,9 @@ services:
       - ${PLUGIN_PATH:-./sample-plugin}:/plugin:ro
       - output:/output
     environment:
+      # PLUGIN_PATH is passed in so the analyzer can derive a friendly name
+      # from the host-side directory (used when no WordPress Plugin Name: header exists).
+      - PLUGIN_PATH=${PLUGIN_PATH:-}
       # LLM_PROVIDER defaults to ollama. The ollama container only starts with
       # --profile llm; the analyzer will print a clear error if it is unreachable.
       # Switch to claude / openai / gemini and set LLM_API_KEY for external APIs.
@@ -17,7 +20,7 @@ services:
       - LLM_API_BASE_URL=${LLM_API_BASE_URL:-}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
       - LLM_BATCH_SIZE=${LLM_BATCH_SIZE:-25}
-      - LLM_TIMEOUT=${LLM_TIMEOUT:-120}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-300}
 
   web:
     build:

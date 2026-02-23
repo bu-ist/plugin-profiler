@@ -11,13 +11,19 @@ use SplFileInfo;
 class FileScanner
 {
     /** Always-skipped directory names regardless of ignore files. */
-    private const SKIP_DIRECTORIES = ['vendor', 'node_modules', '.git'];
+    private const SKIP_DIRECTORIES = ['vendor', 'node_modules', '.git', 'pear'];
 
     /**
-     * Filename suffixes that indicate a minified or compiled bundle.
-     * These files contain single-letter mangled identifiers that produce useless nodes.
+     * Filename suffixes that indicate a minified, compiled, or debug bundle.
+     * Both dot-separated (.min.js) and hyphen-separated (-min.js, -debug.js) forms
+     * are matched — the latter is the convention used by older libraries (Ext JS,
+     * Dojo, jQuery, etc.) that bundle debug builds alongside production files.
      */
-    private const MINIFIED_SUFFIXES = ['.min.js', '.build.js', '.bundle.js', '.chunk.js'];
+    private const MINIFIED_SUFFIXES = [
+        '.min.js', '-min.js',
+        '.build.js', '.bundle.js', '.chunk.js',
+        '-debug.js',
+    ];
 
     private const PHP_EXTENSIONS = ['php'];
     private const JS_EXTENSIONS  = ['js', 'jsx', 'ts', 'tsx'];
