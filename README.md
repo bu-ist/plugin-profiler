@@ -261,20 +261,27 @@ Clicking a node opens a panel showing:
 
 ### Dev only — filtering out bundled libraries
 
-Some plugins ship copies of third-party libraries inside the plugin directory (jQuery UI, Ext JS, Underscore, custom builds, etc.). Without filtering, these can add thousands of nodes that have nothing to do with the plugin you're auditing.
+Some plugins ship copies of third-party libraries inside the plugin directory (jQuery plugins, Backbone, Bootstrap, PHPMailer, React scaffold files, etc.). Without filtering, these nodes add noise that has nothing to do with the plugin you're auditing.
 
 **The "Dev only" button hides all library nodes**, leaving only the code the plugin's author actually wrote.
 
-Library detection is automatic — paths containing any of the following segments are tagged as library code:
+[![Dev only button — off (all nodes) vs on (library nodes hidden). The grey jQuery plugin nodes in the lower-left cluster disappear when Dev only is active.](docs/images/dev-only.png)](docs/images/dev-only.png)
 
-`lib/`, `libs/`, `vendor/` _(non-Composer)_, `third-party/`, `thirdparty/`, `bower_components/`, `packages/`, `dist/`, `build/`, `bundled/`, `dependencies/`, `external/`
+_Top: all nodes including bundled jQuery plugins (grey). Bottom: **Dev only** active — library nodes hidden, developer code only._
+
+Library detection is automatic using three signals (any one is sufficient):
+
+- **Directory segment** — path contains `vendor/` _(non-Composer sub-directory)_, `third-party/`, `thirdparty/`, `bower_components/`, `external/`, `externals/`
+- **Known JS library filename prefix** — `jquery*`, `bootstrap*`, `lodash*`, `backbone*`, `moment*`, `react*`, and [many more](analyzer/src/Graph/GraphBuilder.php)
+- **Known PHP library filename** — `class.phpmailer.php`, `simplepie.php`, `PasswordHash.php`, and others
+- **React/build scaffold filenames** — `reportWebVitals.js`, `setupTests.js`, `serviceWorker.js`, etc.
 
 You can also add a `.profilerignore` file to the plugin root to explicitly exclude any path:
 
 ```
 # .profilerignore
-assets/vendor/
-legacy/ext-js/
+assets/legacy-ext/
+docs/
 ```
 
 > **Tip:** The "Dev only" button only appears in the toolbar when library nodes are actually present in the analysis. For plugins with no bundled code it is hidden automatically.

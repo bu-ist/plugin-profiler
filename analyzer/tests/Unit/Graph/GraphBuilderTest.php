@@ -128,20 +128,44 @@ class GraphBuilderTest extends TestCase
 
     // ── Library detection ─────────────────────────────────────────────────────
 
-    public function testBuild_NodeInLibDir_IsTaggedIsLibrary(): void
+    public function testBuild_NodeInLibDir_IsNotTaggedIsLibrary(): void
     {
+        // lib/ is commonly used for developer-written utilities in WordPress plugins
         $collection = new EntityCollection();
-        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/lib/ext.php'));
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/lib/Calendar.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInVendorSubdir_IsTaggedIsLibrary(): void
+    {
+        // js/vendor/ and assets/vendor/ are bundled third-party libraries
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/js/vendor/jquery.validate.js'));
 
         $graph = $this->builder->build($collection, $this->meta);
 
         $this->assertTrue($graph->nodes[0]->isLibrary);
     }
 
-    public function testBuild_NodeInLibsSubdir_IsTaggedIsLibrary(): void
+    public function testBuild_JsFileWithLibraryFilenamePrefix_IsTaggedIsLibrary(): void
     {
+        // jquery.js in any directory is detected via the filename prefix list
         $collection = new EntityCollection();
-        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/includes/libs/jquery.js'));
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/assets/js/jquery.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_JsFileWithVersionedLibraryFilename_IsTaggedIsLibrary(): void
+    {
+        // jquery-3.6.0.js — versioned library filename
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/assets/jquery-3.6.0.js'));
 
         $graph = $this->builder->build($collection, $this->meta);
 
@@ -177,5 +201,58 @@ class GraphBuilderTest extends TestCase
         $graph = $this->builder->build($collection, $this->meta);
 
         $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_PhpFileWithJqueryLikeName_IsNotTaggedIsLibrary(): void
+    {
+        // Filename prefix detection only applies to .js files, not .php
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/src/jquery-helpers.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_ReactScaffoldFile_IsTaggedIsLibrary(): void
+    {
+        // CRA boilerplate like reportWebVitals.js is scaffold, not developer code
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/plugin/src/reportWebVitals.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_SetupTestsFile_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/plugin/src/setupTests.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_PHPMailerFile_IsTaggedIsLibrary(): void
+    {
+        // Bundled PHPMailer — well-known PHP library bundled inside plugins
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'class', file: '/plugin/includes/class.phpmailer.php'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_ServiceWorkerFile_IsTaggedIsLibrary(): void
+    {
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'A', type: 'function', file: '/plugin/public/serviceWorker.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
     }
 }
