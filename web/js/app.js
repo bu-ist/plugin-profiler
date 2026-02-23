@@ -1,7 +1,9 @@
 import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
-import { openSidebar, closeSidebar, initSidebar } from './sidebar.js';
+import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
 import { initSearch } from './search.js';
+import { EDGE_VIEW_MODES } from './constants.js';
+import { escapeHtml } from './utils.js';
 
 // Max nodes to render in Cytoscape. Beyond this the browser hangs.
 const RENDER_CAP = 1500;
@@ -25,6 +27,7 @@ let _isFocused  = true;   // starts in focus mode
 let _allNodes   = [];     // full node list from graph-data.json (after render cap)
 let _allEdges   = [];     // full edge list from graph-data.json (after render cap)
 let _pluginMeta = {};
+let _viewMode   = 'all';  // current edge view mode ('all' | 'structure' | 'behavior')
 
 // ── capElements ───────────────────────────────────────────────────────────────
 
@@ -213,19 +216,69 @@ function switchView() {
   applyLayout(_cy, _isFocused ? autoLayout : layoutName);
 }
 
+// ── applyViewMode ─────────────────────────────────────────────────────────────
+
+/**
+ * Show/hide edges in the rendered graph based on the current _viewMode.
+ * Nodes are never hidden — only edges are filtered so the graph topology remains
+ * clear even when only one edge category is selected.
+ */
+function applyViewMode() {
+  if (!_cy) return;
+  const mode = EDGE_VIEW_MODES[_viewMode];
+  _cy.batch(() => {
+    if (!mode || !mode.edges) {
+      // "all" — restore everything
+      _cy.edges().removeClass('view-hidden');
+    } else {
+      _cy.edges().forEach((edge) => {
+        const type = edge.data('type') || '';
+        if (mode.edges.has(type)) {
+          edge.removeClass('view-hidden');
+        } else {
+          edge.addClass('view-hidden');
+        }
+      });
+    }
+  });
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
+
+function setLoadingStatus(msg) {
+  const el = document.getElementById('loading-status');
+  if (el) el.textContent = msg;
+}
+
+function hideLoading() {
+  const overlay = document.getElementById('loading');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  overlay.style.pointerEvents = 'none';
+  setTimeout(() => overlay.classList.add('hidden'), 300);
+}
+
+function showLoadingError(html) {
+  const overlay = document.getElementById('loading');
+  if (!overlay) return;
+  overlay.innerHTML = `<div class="flex flex-col items-center gap-3 max-w-md px-6 text-center">${html}</div>`;
+}
 
 async function main() {
   let graphData;
 
+  setLoadingStatus('Fetching analysis data…');
   try {
     const res = await fetch('/data/graph-data.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    setLoadingStatus('Parsing graph data…');
     graphData = await res.json();
   } catch (err) {
-    document.getElementById('loading').innerHTML =
-      '<p class="text-red-400">Failed to load graph data. Run the analyzer first.</p>' +
-      `<p class="text-gray-500 text-xs mt-1">${err.message}</p>`;
+    showLoadingError(
+      '<p class="text-red-400 font-semibold">Failed to load graph data.</p>' +
+      '<p class="text-gray-400 text-sm">Run the analyzer first, then reload this page.</p>' +
+      `<p class="text-gray-600 text-xs mt-1">${err.message}</p>`
+    );
     return;
   }
 
@@ -247,18 +300,14 @@ async function main() {
       hint = `${fileCount} file(s) scanned but no WordPress entities were detected.`;
     }
 
-    document.getElementById('loading').innerHTML = `
-      <div class="text-center max-w-lg px-6">
-        <p class="text-yellow-400 text-lg font-semibold mb-3">No entities found</p>
-        <p class="text-gray-400 text-sm mb-4">${hint}</p>
-        <p class="text-gray-500 text-xs leading-relaxed">Plugin Profiler analyzes PHP classes, WordPress hooks, REST endpoints, AJAX handlers, data sources, Gutenberg blocks, and file dependencies. React/JS build artifacts are also scanned for <code class="text-gray-400">registerBlockType</code> and <code class="text-gray-400">wp.hooks</code> calls.</p>
-        ${p.name ? `<p class="text-gray-600 text-xs mt-4">Analyzed: <span class="text-gray-500">${p.name}</span></p>` : ''}
-      </div>`;
+    showLoadingError(`
+      <p class="text-yellow-400 text-lg font-semibold">No entities found</p>
+      <p class="text-gray-400 text-sm">${hint}</p>
+      <p class="text-gray-500 text-xs leading-relaxed">Plugin Profiler analyzes PHP classes, WordPress hooks, REST endpoints, AJAX handlers, data sources, Gutenberg blocks, and file dependencies. React/JS build artifacts are also scanned for <code class="text-gray-400">registerBlockType</code> and <code class="text-gray-400">wp.hooks</code> calls.</p>
+      ${p.name ? `<p class="text-gray-600 text-xs mt-2">Analyzed: <span class="text-gray-500">${escapeHtml(p.name)}</span></p>` : ''}
+    `);
     return;
   }
-
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('main-layout').classList.remove('hidden');
 
   // Populate plugin meta
   const p          = graphData.plugin || {};
@@ -278,8 +327,10 @@ async function main() {
   _isFocused  = true;
 
   // Build initial focus set — flat, no compound nodes
+  setLoadingStatus('Building focus view…');
   const focused = buildFocusSet(_allNodes, _allEdges, _pluginMeta);
 
+  setLoadingStatus('Initialising graph…');
   // Initialise Cytoscape with just the focus set
   _cy = initCytoscape(
     document.getElementById('cy'),
@@ -309,6 +360,9 @@ async function main() {
   initSidebar(_cy);
   initSearch(_cy, graphData.nodes || []);
 
+  // Show AI summary as the default sidebar state when available
+  openPluginSummary(p);
+
   // Auto-select layout for the focus set (small, sparse → always fCoSE)
   const maxEdges   = focused.nodes.length > 1
     ? (focused.nodes.length * (focused.nodes.length - 1)) / 2
@@ -325,7 +379,12 @@ async function main() {
     });
   }
 
+  setLoadingStatus('Applying layout…');
   applyLayout(_cy, autoLayout);
+
+  // Graph is ready — fade out the loading overlay
+  hideLoading();
+
   updateFocusButton(focused.focusCount, focused.totalCount);
   showStatusBanner(focused.focusCount, focused.totalCount, true);
 
@@ -333,6 +392,26 @@ async function main() {
   document.getElementById('focus-btn')?.addEventListener('click', () => {
     _isFocused = !_isFocused;
     switchView();
+  });
+
+  // View mode buttons — filter edges to Structure or Behavior subset
+  document.getElementById('view-mode-btns')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-view]');
+    if (!btn) return;
+    const mode = btn.dataset.view;
+    if (mode === _viewMode) return;
+    _viewMode = mode;
+
+    // Update button highlight
+    document.querySelectorAll('.view-mode-btn').forEach((b) => {
+      const active = b.dataset.view === mode;
+      b.classList.toggle('bg-blue-600', active);
+      b.classList.toggle('text-white',  active);
+      b.classList.toggle('bg-gray-700', !active);
+      b.classList.toggle('text-gray-400', !active);
+    });
+
+    applyViewMode();
   });
 
   // Collapse/Expand toggle — requires the expand-collapse extension to be

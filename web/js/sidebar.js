@@ -1,4 +1,5 @@
 import { nodeBadge } from './constants.js';
+import { escapeHtml } from './utils.js';
 
 // All node types that originate from JavaScript files — these get JS syntax
 // highlighting in the source preview block instead of PHP highlighting.
@@ -8,10 +9,27 @@ const JS_TYPES = new Set([
   'fetch_call', 'axios_call',
 ]);
 
-let _cy = null;
+let _cy         = null;
+let _pluginData = null;  // Plugin block from graph-data.json (may include summary)
 
 export function initSidebar(cy) {
   _cy = cy;
+}
+
+/**
+ * Store the plugin metadata block and, if it contains an AI-generated summary,
+ * display it as the sidebar's default state. Calling this replaces any
+ * previously open node panel.
+ */
+export function openPluginSummary(plugin) {
+  _pluginData = plugin;
+  if (!plugin?.summary) return;  // No summary — keep sidebar hidden
+
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  sidebar.innerHTML = buildPluginSummaryHtml(plugin);
+  sidebar.classList.remove('hidden');
+  sidebar.classList.add('flex');
 }
 
 export function openSidebar(nodeData) {
@@ -45,6 +63,13 @@ export function openSidebar(nodeData) {
 }
 
 export function closeSidebar() {
+  // When a plugin summary is available, closing a node panel reverts to it
+  // rather than hiding the sidebar entirely.
+  if (_pluginData?.summary) {
+    openPluginSummary(_pluginData);
+    return;
+  }
+
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
   sidebar.classList.add('hidden');
@@ -140,13 +165,6 @@ function buildSidebarHtml(data) {
 
     <div class="mt-3 text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Source Preview</div>
     ${sourceHtml}
-
-    <script>
-      document.getElementById('sidebar-close')?.addEventListener('click', () => {
-        document.getElementById('sidebar').classList.add('hidden');
-        document.getElementById('sidebar').classList.remove('flex');
-      });
-    </script>
   `;
 }
 
@@ -193,12 +211,35 @@ function buildVsCodeLink(data) {
   return `vscode://file/${data.file}:${data.line || 0}`;
 }
 
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+/**
+ * Build HTML for the default plugin overview panel (shown when no node is selected).
+ * The summary text is split on double-newlines to produce readable paragraphs.
+ */
+function buildPluginSummaryHtml(plugin) {
+  const paragraphs = (plugin.summary || '')
+    .split('\n\n')
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p class="text-sm leading-relaxed text-slate-200">${escapeHtml(p)}</p>`)
+    .join('');
+
+  return `
+    <div class="mb-3">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="px-2 py-0.5 rounded text-xs font-semibold text-white bg-indigo-600">Plugin</span>
+        <span class="font-semibold text-white truncate" title="${escapeHtml(plugin.name || '')}">${escapeHtml(plugin.name || 'Unknown Plugin')}</span>
+      </div>
+      ${plugin.version ? `<div class="text-xs text-gray-500 mb-1">${escapeHtml(plugin.version)}</div>` : ''}
+    </div>
+
+    <div class="rounded-lg border border-indigo-800/40 bg-indigo-950/50 p-3">
+      <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold text-indigo-400">
+        <span aria-hidden="true">✦</span><span>AI Architecture Overview</span>
+      </div>
+      <div class="space-y-2">${paragraphs}</div>
+    </div>
+
+    <div class="text-xs text-gray-500 italic text-center mt-4">Click any node to inspect it.</div>
+  `;
 }
+
