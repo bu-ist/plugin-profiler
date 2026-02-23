@@ -35,15 +35,42 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
         match ($funcName) {
             'register_rest_route'          => $this->handleRestRoute($node),
             'add_shortcode'               => $this->handleShortcode($node),
+            // All add_*_page variants — slug is always arg 3 (except add_submenu_page which is 4)
             'add_menu_page',
-            'add_submenu_page'            => $this->handleAdminPage($node, $funcName),
+            'add_submenu_page',
+            'add_options_page',
+            'add_theme_page',
+            'add_plugins_page',
+            'add_management_page',
+            'add_users_page',
+            'add_dashboard_page',
+            'add_posts_page',
+            'add_media_page',
+            'add_links_page',
+            'add_comments_page'           => $this->handleAdminPage($node, $funcName),
             'wp_schedule_event',
             'wp_schedule_single_event'    => $this->handleCronJob($node),
             'register_post_type'          => $this->handlePostType($node),
             'register_taxonomy'           => $this->handleTaxonomy($node),
+            // Standard and safe remote HTTP functions
             'wp_remote_get',
             'wp_remote_post',
-            'wp_remote_request'           => $this->handleHttpCall($node, $funcName),
+            'wp_remote_request',
+            'wp_remote_head',
+            'wp_remote_delete',
+            'wp_remote_patch',
+            'wp_remote_put',
+            'wp_safe_remote_get',
+            'wp_safe_remote_post',
+            'wp_safe_remote_request'      => $this->handleHttpCall($node, $funcName),
+            // Server-side block registration
+            'register_block_type',
+            'register_block_type_from_metadata' => $this->handleBlockType($node),
+            // Script/style enqueueing
+            'wp_enqueue_script',
+            'wp_register_script'          => $this->handleEnqueueScript($node),
+            'wp_enqueue_style',
+            'wp_register_style'           => $this->handleEnqueueStyle($node),
             'add_action', 'add_filter'    => $this->handleAjaxHook($node),
             default                       => null,
         };
@@ -123,9 +150,10 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
 
     private function handleAdminPage(Expr\FuncCall $node, string $funcName): void
     {
-        // add_menu_page($page_title, $menu_title, $capability, $menu_slug, ...)
         // add_submenu_page($parent_slug, $page_title, $menu_title, $capability, $menu_slug, ...)
-        $slugIndex = $funcName === 'add_submenu_page' ? 4 : 3;
+        // All other add_*_page($page_title, $menu_title, $capability, $menu_slug, ...)
+        $slugIndex  = $funcName === 'add_submenu_page' ? 4 : 3;
+        $titleIndex = $funcName === 'add_submenu_page' ? 1 : 0;
 
         if (!isset($node->args[$slugIndex])) {
             return;
@@ -136,7 +164,6 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
-        $titleIndex = $funcName === 'add_submenu_page' ? 1 : 0;
         $title      = isset($node->args[$titleIndex])
             ? ($this->resolveStringArg($node->args[$titleIndex]->value) ?? $slug)
             : $slug;
@@ -229,10 +256,14 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
     private function handleHttpCall(Expr\FuncCall $node, string $funcName): void
     {
         $url    = null;
-        $method = match ($funcName) {
-            'wp_remote_post'    => 'POST',
-            'wp_remote_get'     => 'GET',
-            default             => 'REQUEST',
+        $method = match (true) {
+            str_contains($funcName, '_post')    => 'POST',
+            str_contains($funcName, '_get')     => 'GET',
+            str_contains($funcName, '_head')    => 'HEAD',
+            str_contains($funcName, '_delete')  => 'DELETE',
+            str_contains($funcName, '_patch')   => 'PATCH',
+            str_contains($funcName, '_put')     => 'PUT',
+            default                             => 'REQUEST',
         };
 
         if (isset($node->args[0])) {
@@ -321,6 +352,113 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
         }
 
         return ['GET'];
+    }
+
+    /**
+     * PHP-side block registration: register_block_type($type, $args) or
+     * register_block_type_from_metadata($path, $args).
+     *
+     * $type can be 'namespace/block-name' (string literal) or a path to a
+     * directory containing block.json.  We handle the string-literal case;
+     * path-based calls are skipped (block.json is handled by BlockJsonVisitor).
+     */
+    private function handleBlockType(Expr\FuncCall $node): void
+    {
+        if (!isset($node->args[0])) {
+            return;
+        }
+
+        $blockName = $this->resolveStringArg($node->args[0]->value);
+        if ($blockName === null) {
+            return;
+        }
+
+        // Skip bare directory paths — BlockJsonVisitor covers those
+        if (str_starts_with($blockName, '/') || str_starts_with($blockName, '.')) {
+            return;
+        }
+
+        $nodeId = 'block_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $blockName);
+        $this->collection->addNode(GraphNode::make(
+            id: $nodeId,
+            label: $blockName,
+            type: 'gutenberg_block',
+            file: $this->collection->getCurrentFile(),
+            line: $node->getStartLine(),
+            metadata: ['block_name' => $blockName],
+        ));
+
+        $this->addCallerEdge($nodeId, 'registers');
+    }
+
+    /**
+     * Script registration: wp_enqueue_script($handle, $src, $deps, $ver, $args) and
+     * wp_register_script($handle, $src, $deps, $ver, $strategy).
+     *
+     * Creates a `file` node keyed by the handle and an `enqueues_script` edge
+     * from the enclosing function/file to that node.
+     */
+    private function handleEnqueueScript(Expr\FuncCall $node): void
+    {
+        if (!isset($node->args[0])) {
+            return;
+        }
+
+        $handle = $this->resolveStringArg($node->args[0]->value);
+        if ($handle === null) {
+            return;
+        }
+
+        $nodeId = 'script_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $handle);
+
+        if (!$this->collection->hasNode($nodeId)) {
+            $this->collection->addNode(GraphNode::make(
+                id: $nodeId,
+                label: $handle,
+                type: 'file',
+                file: $this->collection->getCurrentFile(),
+                line: $node->getStartLine(),
+                subtype: 'script',
+            ));
+        }
+
+        // Use enqueues_script as the Cytoscape edge type directly so it matches
+        // the edge style selector and view-mode filter (not the generic 'registers' type).
+        $this->ensureFileNode();
+        $this->collection->addEdge(
+            Edge::make($this->currentCallerOrFileId(), $nodeId, 'enqueues_script', 'enqueues')
+        );
+    }
+
+    /**
+     * Style registration: wp_enqueue_style($handle, ...) and wp_register_style($handle, ...).
+     * Mirrors handleEnqueueScript — creates a `file` node for the stylesheet handle.
+     */
+    private function handleEnqueueStyle(Expr\FuncCall $node): void
+    {
+        if (!isset($node->args[0])) {
+            return;
+        }
+
+        $handle = $this->resolveStringArg($node->args[0]->value);
+        if ($handle === null) {
+            return;
+        }
+
+        $nodeId = 'style_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $handle);
+
+        if (!$this->collection->hasNode($nodeId)) {
+            $this->collection->addNode(GraphNode::make(
+                id: $nodeId,
+                label: $handle,
+                type: 'file',
+                file: $this->collection->getCurrentFile(),
+                line: $node->getStartLine(),
+                subtype: 'style',
+            ));
+        }
+
+        $this->addCallerEdge($nodeId, 'enqueues_script');
     }
 
     private function resolveStringArg(Expr $expr): ?string

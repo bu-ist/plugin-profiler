@@ -85,6 +85,21 @@ const EDGE_STYLES = [
     selector: 'edge[type="js_block_matches_php"]',
     style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
   },
+  // Hook deregistration — dashed red (signals removal / teardown)
+  {
+    selector: 'edge[type="deregisters_hook"]',
+    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#F87171', 'target-arrow-color': '#F87171' },
+  },
+  // WordPress data store reads — solid amber (reads_store like reads_data but amber)
+  {
+    selector: 'edge[type="reads_store"]',
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D' },
+  },
+  // WordPress data store writes — dashed amber (writes_store like writes_data but amber)
+  {
+    selector: 'edge[type="writes_store"]',
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D' },
+  },
 ];
 
 // ── Stylesheet builder ────────────────────────────────────────────────────────

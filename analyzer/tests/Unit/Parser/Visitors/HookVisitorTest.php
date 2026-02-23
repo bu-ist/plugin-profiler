@@ -141,4 +141,49 @@ class HookVisitorTest extends TestCase
         $this->assertSame('dynamic', $hook->label, 'Dynamic hook name should produce a readable label');
         $this->assertStringContainsString('dynamic_', $hook->id, 'Dynamic hook ID should contain hash for uniqueness');
     }
+
+    public function testEnterNode_WithDoActionRefArray_CreatesTriggerEdge(): void
+    {
+        $this->parse('<?php do_action_ref_array("my_hook", [$arg]);');
+
+        $this->assertTrue($this->collection->hasNode('hook_action_my_hook'));
+
+        $edges        = $this->collection->getAllEdges();
+        $triggerEdges = array_filter($edges, static fn ($e) => $e->type === 'triggers_hook');
+        $this->assertNotEmpty($triggerEdges, 'Expected a triggers_hook edge from do_action_ref_array');
+    }
+
+    public function testEnterNode_WithApplyFiltersRefArray_CreatesFilterNode(): void
+    {
+        $this->parse('<?php apply_filters_ref_array("my_filter", [$value]);');
+
+        $this->assertTrue($this->collection->hasNode('hook_filter_my_filter'));
+        $node = $this->collection->getNode('hook_filter_my_filter');
+        $this->assertSame('filter', $node?->subtype);
+    }
+
+    public function testEnterNode_WithRemoveAction_CreatesDeregistersHookEdge(): void
+    {
+        $this->parse('<?php remove_action("init", "my_func", 10);');
+
+        $this->assertTrue($this->collection->hasNode('hook_action_init'), 'Hook node should be created');
+
+        $edges            = $this->collection->getAllEdges();
+        $deregisterEdges  = array_filter($edges, static fn ($e) => $e->type === 'deregisters_hook');
+        $this->assertNotEmpty($deregisterEdges, 'Expected a deregisters_hook edge from remove_action');
+
+        $edge = reset($deregisterEdges);
+        $this->assertSame('hook_action_init', $edge->target);
+    }
+
+    public function testEnterNode_WithRemoveFilter_CreatesDeregistersHookEdgeForFilter(): void
+    {
+        $this->parse('<?php remove_filter("the_content", "my_filter_func");');
+
+        $this->assertTrue($this->collection->hasNode('hook_filter_the_content'));
+
+        $edges           = $this->collection->getAllEdges();
+        $deregisterEdges = array_filter($edges, static fn ($e) => $e->type === 'deregisters_hook');
+        $this->assertNotEmpty($deregisterEdges, 'Expected a deregisters_hook edge from remove_filter');
+    }
 }

@@ -12,16 +12,35 @@ use PluginProfiler\Graph\Node as GraphNode;
 
 class DataSourceVisitor extends NamespaceAwareVisitor
 {
+    // WordPress options API
     private const OPTION_READ    = ['get_option'];
     private const OPTION_WRITE   = ['update_option', 'add_option'];
     private const OPTION_DELETE  = ['delete_option'];
+    // Multisite options
+    private const SITE_OPTION_READ  = ['get_site_option', 'get_network_option'];
+    private const SITE_OPTION_WRITE = ['update_site_option', 'add_site_option', 'update_network_option', 'add_network_option'];
+    private const SITE_OPTION_DELETE = ['delete_site_option', 'delete_network_option'];
+    // Post meta
     private const POST_META_READ  = ['get_post_meta'];
     private const POST_META_WRITE = ['update_post_meta', 'add_post_meta', 'delete_post_meta'];
+    // User meta
     private const USER_META_READ  = ['get_user_meta'];
-    private const USER_META_WRITE = ['update_user_meta'];
-    private const TRANSIENT_READ  = ['get_transient'];
-    private const TRANSIENT_WRITE = ['set_transient'];
-    private const TRANSIENT_DELETE = ['delete_transient'];
+    private const USER_META_WRITE = ['update_user_meta', 'add_user_meta', 'delete_user_meta'];
+    // Term meta
+    private const TERM_META_READ  = ['get_term_meta'];
+    private const TERM_META_WRITE = ['update_term_meta', 'add_term_meta', 'delete_term_meta'];
+    // Comment meta
+    private const COMMENT_META_READ  = ['get_comment_meta'];
+    private const COMMENT_META_WRITE = ['update_comment_meta', 'add_comment_meta', 'delete_comment_meta'];
+    // Transients (site-level transients included)
+    private const TRANSIENT_READ  = ['get_transient', 'get_site_transient'];
+    private const TRANSIENT_WRITE = ['set_transient', 'set_site_transient'];
+    private const TRANSIENT_DELETE = ['delete_transient', 'delete_site_transient'];
+    // Object cache
+    private const CACHE_READ  = ['wp_cache_get', 'wp_cache_get_multiple'];
+    private const CACHE_WRITE = ['wp_cache_set', 'wp_cache_add', 'wp_cache_replace', 'wp_cache_set_multiple'];
+    private const CACHE_DELETE = ['wp_cache_delete', 'wp_cache_flush'];
+    // $wpdb methods
     private const WPDB_READ   = ['get_results', 'get_row', 'get_var', 'get_col', 'query'];
     private const WPDB_WRITE  = ['insert', 'update', 'replace'];
     private const WPDB_DELETE = ['delete'];
@@ -91,17 +110,27 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         }
 
         [$operation, $subtype] = match (true) {
-            in_array($name, self::OPTION_READ, true)     => ['read', 'option'],
-            in_array($name, self::OPTION_WRITE, true)    => ['write', 'option'],
-            in_array($name, self::OPTION_DELETE, true)   => ['delete', 'option'],
-            in_array($name, self::POST_META_READ, true)  => ['read', 'post_meta'],
-            in_array($name, self::POST_META_WRITE, true) => ['write', 'post_meta'],
-            in_array($name, self::USER_META_READ, true)  => ['read', 'user_meta'],
-            in_array($name, self::USER_META_WRITE, true) => ['write', 'user_meta'],
-            in_array($name, self::TRANSIENT_READ, true)  => ['read', 'transient'],
-            in_array($name, self::TRANSIENT_WRITE, true) => ['write', 'transient'],
-            in_array($name, self::TRANSIENT_DELETE, true) => ['delete', 'transient'],
-            default => [null, null],
+            in_array($name, self::OPTION_READ, true)         => ['read',   'option'],
+            in_array($name, self::OPTION_WRITE, true)        => ['write',  'option'],
+            in_array($name, self::OPTION_DELETE, true)       => ['delete', 'option'],
+            in_array($name, self::SITE_OPTION_READ, true)    => ['read',   'site_option'],
+            in_array($name, self::SITE_OPTION_WRITE, true)   => ['write',  'site_option'],
+            in_array($name, self::SITE_OPTION_DELETE, true)  => ['delete', 'site_option'],
+            in_array($name, self::POST_META_READ, true)      => ['read',   'post_meta'],
+            in_array($name, self::POST_META_WRITE, true)     => ['write',  'post_meta'],
+            in_array($name, self::USER_META_READ, true)      => ['read',   'user_meta'],
+            in_array($name, self::USER_META_WRITE, true)     => ['write',  'user_meta'],
+            in_array($name, self::TERM_META_READ, true)      => ['read',   'term_meta'],
+            in_array($name, self::TERM_META_WRITE, true)     => ['write',  'term_meta'],
+            in_array($name, self::COMMENT_META_READ, true)   => ['read',   'comment_meta'],
+            in_array($name, self::COMMENT_META_WRITE, true)  => ['write',  'comment_meta'],
+            in_array($name, self::TRANSIENT_READ, true)      => ['read',   'transient'],
+            in_array($name, self::TRANSIENT_WRITE, true)     => ['write',  'transient'],
+            in_array($name, self::TRANSIENT_DELETE, true)    => ['delete', 'transient'],
+            in_array($name, self::CACHE_READ, true)          => ['read',   'cache'],
+            in_array($name, self::CACHE_WRITE, true)         => ['write',  'cache'],
+            in_array($name, self::CACHE_DELETE, true)        => ['delete', 'cache'],
+            default                                          => [null,     null],
         };
 
         if ($operation === null) {
@@ -222,11 +251,14 @@ class DataSourceVisitor extends NamespaceAwareVisitor
     {
         // The key argument position varies by function type
         $keyArgIndex = match ($subtype) {
-            'option'    => 0,
-            'post_meta' => 1, // get_post_meta($post_id, $meta_key, ...)
-            'user_meta' => 1, // get_user_meta($user_id, $meta_key, ...)
-            'transient' => 0,
-            default     => 0,
+            'option', 'site_option' => 0,
+            'post_meta'    => 1, // get_post_meta($post_id, $meta_key, ...)
+            'user_meta'    => 1, // get_user_meta($user_id, $meta_key, ...)
+            'term_meta'    => 1, // get_term_meta($term_id, $meta_key, ...)
+            'comment_meta' => 1, // get_comment_meta($comment_id, $meta_key, ...)
+            'transient'    => 0,
+            'cache'        => 0, // wp_cache_get($key, $group, ...)
+            default        => 0,
         };
 
         if (!isset($node->args[$keyArgIndex])) {

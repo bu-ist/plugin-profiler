@@ -114,4 +114,68 @@ class ExternalInterfaceVisitorTest extends TestCase
 
         $this->assertTrue($this->collection->hasNode('ajax_my_action'));
     }
+
+    public function testEnterNode_WithAddOptionsPage_CreatesAdminPageNode(): void
+    {
+        $this->parse('<?php add_options_page("Settings", "My Plugin", "manage_options", "my-settings");');
+
+        $nodes     = $this->collection->getAllNodes();
+        $adminNodes = array_filter($nodes, static fn ($n) => $n->type === 'admin_page');
+        $this->assertNotEmpty($adminNodes, 'Expected an admin_page node from add_options_page');
+    }
+
+    public function testEnterNode_WithAddThemePage_CreatesAdminPageNode(): void
+    {
+        $this->parse('<?php add_theme_page("Theme Options", "Theme", "manage_options", "theme-options");');
+
+        $nodes     = $this->collection->getAllNodes();
+        $adminNodes = array_filter($nodes, static fn ($n) => $n->type === 'admin_page');
+        $this->assertNotEmpty($adminNodes, 'Expected an admin_page node from add_theme_page');
+    }
+
+    public function testEnterNode_WithWpSafeRemoteGet_CreatesHttpCallNode(): void
+    {
+        $this->parse('<?php wp_safe_remote_get("https://example.com/api");');
+
+        $nodes     = $this->collection->getAllNodes();
+        $httpNodes = array_filter($nodes, static fn ($n) => $n->type === 'http_call');
+        $this->assertNotEmpty($httpNodes, 'Expected an http_call node from wp_safe_remote_get');
+    }
+
+    public function testEnterNode_WithWpRemotePost_CreatesHttpCallWithPostMethod(): void
+    {
+        $this->parse('<?php wp_remote_post("https://example.com/api");');
+
+        $nodes     = $this->collection->getAllNodes();
+        $httpNodes = array_filter($nodes, static fn ($n) => $n->type === 'http_call');
+        $this->assertNotEmpty($httpNodes);
+
+        $node = reset($httpNodes);
+        $this->assertSame('POST', $node->metadata['http_method']);
+    }
+
+    public function testEnterNode_WithRegisterBlockType_CreatesGutenbergBlockNode(): void
+    {
+        $this->parse('<?php register_block_type("my-plugin/my-block", []);');
+
+        $nodes      = $this->collection->getAllNodes();
+        $blockNodes = array_filter($nodes, static fn ($n) => $n->type === 'gutenberg_block');
+        $this->assertNotEmpty($blockNodes, 'Expected a gutenberg_block node from register_block_type');
+
+        $block = reset($blockNodes);
+        $this->assertSame('my-plugin/my-block', $block->label);
+    }
+
+    public function testEnterNode_WithWpEnqueueScript_CreatesFileNodeAndEnqueuesEdge(): void
+    {
+        $this->parse('<?php wp_enqueue_script("my-script", get_plugin_file_uri("js/app.js"), ["jquery"]);');
+
+        $nodes       = $this->collection->getAllNodes();
+        $scriptNodes = array_filter($nodes, static fn ($n) => $n->id === 'script_my_script');
+        $this->assertNotEmpty($scriptNodes, 'Expected a script node for handle my-script');
+
+        $edges        = $this->collection->getAllEdges();
+        $enqueueEdges = array_filter($edges, static fn ($e) => $e->type === 'enqueues_script');
+        $this->assertNotEmpty($enqueueEdges, 'Expected an enqueues_script edge');
+    }
 }

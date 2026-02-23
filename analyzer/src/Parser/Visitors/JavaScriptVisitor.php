@@ -17,11 +17,12 @@ use PluginProfiler\Graph\Node as GraphNode;
  *   react_hook       — useState, useEffect, useContext, custom hooks
  *   js_function      — Plain JS function declarations
  *   js_class         — Class declarations
- *   js_hook          — wp.hooks.addAction / addFilter
+ *   js_hook          — wp.hooks.addAction/addFilter (register), doAction/applyFilters (trigger), removeAction/removeFilter (remove)
  *   js_api_call      — WordPress apiFetch()
- *   fetch_call       — Native fetch()
+ *   fetch_call       — Native fetch() or jQuery $.ajax/$.get/$.post
  *   axios_call       — axios.get/post/etc.
  *   gutenberg_block  — registerBlockType()
+ *   wp_store         — @wordpress/data select/dispatch/subscribe store access
  *   js_import        — Third-party package imports (for dependency edges)
  */
 class JavaScriptVisitor
@@ -164,10 +165,33 @@ class JavaScriptVisitor
                 break;
 
             case 'js_hook':
-                $hookType = $subtype ?: 'action';
-                $nodeId   = 'js_hook_' . $hookType . '_' . GraphNode::sanitizeId($name);
-                $this->addNode($nodeId, $name, 'js_hook', $filePath, $l, array_merge($meta, ['hook_name' => $name]), $hookType);
-                $this->addEdge($fileNodeId, $nodeId, 'js_registers_hook', 'registers');
+                $hookBaseType = match ($subtype) {
+                    'action', 'filter' => 'register',
+                    'action_trigger', 'filter_trigger' => 'trigger',
+                    'action_remove', 'filter_remove' => 'remove',
+                    default => 'register',
+                };
+                // Normalise type for node ID: strip trigger/remove suffixes
+                $hookKind = str_contains($subtype, 'action') ? 'action' : 'filter';
+                $nodeId   = 'js_hook_' . $hookKind . '_' . GraphNode::sanitizeId($name);
+                $this->addNode($nodeId, $name, 'js_hook', $filePath, $l, array_merge($meta, ['hook_name' => $name]), $hookKind);
+                $edgeType = match ($hookBaseType) {
+                    'trigger' => 'triggers_hook',
+                    'remove'  => 'deregisters_hook',
+                    default   => 'js_registers_hook',
+                };
+                $this->addEdge($fileNodeId, $nodeId, $edgeType, $hookBaseType);
+                break;
+
+            case 'wp_store':
+                $storeId = GraphNode::sanitizeId('wp_store_' . ($meta['store'] ?? $name));
+                $this->addNode($storeId, $name, 'wp_store', $filePath, $l, $meta, $subtype);
+                $edgeType = match ($subtype) {
+                    'write'     => 'writes_store',
+                    'subscribe' => 'reads_store',
+                    default     => 'reads_store',
+                };
+                $this->addEdge($fileNodeId, $storeId, $edgeType, $subtype ?: 'reads');
                 break;
 
             case 'js_api_call':

@@ -21,6 +21,7 @@
  *   Cyan   — React components
  *   Violet — React hooks
  *   Rose   — Network fetch calls
+ *   Amber  — WordPress data stores (@wordpress/data)
  *   Slate  — Compound group nodes (recede behind their children)
  */
 
@@ -75,6 +76,9 @@ export const NODE_TYPES = {
   fetch_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-500' },
   axios_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-500' },
 
+  // ── WordPress data stores — amber ──────────────────────────────────────────
+  wp_store:         { color: '#F59E0B', shape: 'barrel',          badge: 'bg-amber-500' },
+
   // ── Compound group nodes — neutral slate (recede behind their children) ───
   namespace:        { color: '#1E293B', shape: 'round-rectangle', badge: 'bg-slate-600' },
   dir:              { color: '#0F172A', shape: 'round-rectangle', badge: 'bg-slate-700' },
@@ -112,10 +116,13 @@ export const EDGE_VIEW_MODES = {
     // Runtime / event-driven edges: what happens when WordPress fires events
     // and data moves through the system?
     edges: new Set([
-      // WordPress hook system
+      // WordPress hook system (register, trigger, remove)
       'registers_hook', 'triggers_hook', 'triggers_handler', 'js_registers_hook',
+      'deregisters_hook',
       // Database / storage
       'reads_data', 'writes_data',
+      // WordPress data store (@wordpress/data)
+      'reads_store', 'writes_store',
       // WordPress runtime registrations (all happen at init / admin_init)
       'registers',
       'registers_rest', 'registers_shortcode', 'registers_page', 'registers_ajax',

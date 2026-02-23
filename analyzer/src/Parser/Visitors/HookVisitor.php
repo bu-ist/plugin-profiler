@@ -13,8 +13,14 @@ use PluginProfiler\Graph\Node as GraphNode;
 class HookVisitor extends NamespaceAwareVisitor
 {
     private const REGISTER_FUNCS = ['add_action', 'add_filter'];
-    private const TRIGGER_FUNCS  = ['do_action', 'apply_filters'];
-    private const ALL_HOOK_FUNCS = ['add_action', 'add_filter', 'do_action', 'apply_filters'];
+    private const TRIGGER_FUNCS  = ['do_action', 'apply_filters', 'do_action_ref_array', 'apply_filters_ref_array'];
+    private const REMOVE_FUNCS   = ['remove_action', 'remove_filter', 'remove_all_actions', 'remove_all_filters'];
+    private const ALL_HOOK_FUNCS = [
+        'add_action', 'add_filter',
+        'do_action', 'apply_filters',
+        'do_action_ref_array', 'apply_filters_ref_array',
+        'remove_action', 'remove_filter', 'remove_all_actions', 'remove_all_filters',
+    ];
 
     public function enterNode(Node $node): ?int
     {
@@ -29,7 +35,11 @@ class HookVisitor extends NamespaceAwareVisitor
             return null;
         }
 
-        $this->handleHookCall($node, $funcName);
+        if (in_array($funcName, self::REMOVE_FUNCS, true)) {
+            $this->handleRemoveHook($node, $funcName);
+        } else {
+            $this->handleHookCall($node, $funcName);
+        }
 
         return null;
     }
@@ -43,7 +53,7 @@ class HookVisitor extends NamespaceAwareVisitor
 
         $hookNameArg = $node->args[0]->value;
         $hookName    = $this->resolveHookName($hookNameArg, $node);
-        $isFilter    = in_array($funcName, ['add_filter', 'apply_filters'], true);
+        $isFilter    = in_array($funcName, ['add_filter', 'apply_filters', 'apply_filters_ref_array'], true);
         $hookType    = $isFilter ? 'filter' : 'action';
         $hookId      = 'hook_' . $hookType . '_' . $hookName;
 
@@ -110,6 +120,42 @@ class HookVisitor extends NamespaceAwareVisitor
                 Edge::make($this->currentCallerOrFileId(), $hookId, 'triggers_hook', 'triggers')
             );
         }
+    }
+
+    /**
+     * Handle remove_action / remove_filter / remove_all_actions / remove_all_filters.
+     *
+     * Creates the hook node (if not already present) and adds a `deregisters_hook`
+     * edge from the enclosing caller so the graph shows which code tears down hooks.
+     */
+    private function handleRemoveHook(Expr\FuncCall $node, string $funcName): void
+    {
+        if (!isset($node->args[0])) {
+            return;
+        }
+
+        $hookName = $this->resolveHookName($node->args[0]->value, $node);
+        $isFilter = in_array($funcName, ['remove_filter', 'remove_all_filters'], true);
+        $hookType = $isFilter ? 'filter' : 'action';
+        $hookId   = 'hook_' . $hookType . '_' . $hookName;
+
+        $hookLabel = str_starts_with($hookName, 'dynamic_') ? 'dynamic' : $hookName;
+
+        // Ensure the hook node exists so the edge target is valid
+        $this->collection->addNode(GraphNode::make(
+            id: $hookId,
+            label: $hookLabel,
+            type: 'hook',
+            file: $this->collection->getCurrentFile(),
+            line: $node->getStartLine(),
+            subtype: $hookType,
+            metadata: ['hook_name' => $hookName],
+        ));
+
+        $this->ensureFileNode();
+        $this->collection->addEdge(
+            Edge::make($this->currentCallerOrFileId(), $hookId, 'deregisters_hook', 'removes')
+        );
     }
 
     /**

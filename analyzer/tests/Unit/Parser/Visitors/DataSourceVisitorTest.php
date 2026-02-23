@@ -152,4 +152,68 @@ class DataSourceVisitorTest extends TestCase
         $dbNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'database');
         $this->assertEmpty($dbNodes, 'Variables unrelated to PDO/MySQLi should not produce database nodes');
     }
+
+    // ── Multisite / site options ───────────────────────────────────────────────
+
+    public function testEnterNode_WithGetSiteOption_CreatesSiteOptionReadNode(): void
+    {
+        $this->parse('<?php get_site_option("network_setting");');
+
+        $nodes       = $this->collection->getAllNodes();
+        $optionNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'site_option' && $n->metadata['operation'] === 'read');
+        $this->assertNotEmpty($optionNodes, 'get_site_option should produce a site_option read node');
+    }
+
+    public function testEnterNode_WithUpdateSiteOption_CreatesSiteOptionWriteNode(): void
+    {
+        $this->parse('<?php update_site_option("network_setting", $val);');
+
+        $nodes       = $this->collection->getAllNodes();
+        $optionNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'site_option' && $n->metadata['operation'] === 'write');
+        $this->assertNotEmpty($optionNodes, 'update_site_option should produce a site_option write node');
+    }
+
+    // ── Term and comment meta ─────────────────────────────────────────────────
+
+    public function testEnterNode_WithGetTermMeta_CreatesTermMetaReadNode(): void
+    {
+        $this->parse('<?php get_term_meta(42, "color", true);');
+
+        $nodes      = $this->collection->getAllNodes();
+        $metaNodes  = array_filter($nodes, static fn ($n) => $n->subtype === 'term_meta');
+        $this->assertNotEmpty($metaNodes, 'get_term_meta should produce a term_meta node');
+
+        $node = reset($metaNodes);
+        $this->assertSame('read', $node->metadata['operation']);
+        $this->assertSame('color', $node->metadata['key']);
+    }
+
+    public function testEnterNode_WithGetCommentMeta_CreatesCommentMetaReadNode(): void
+    {
+        $this->parse('<?php get_comment_meta(5, "rating", true);');
+
+        $nodes     = $this->collection->getAllNodes();
+        $metaNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'comment_meta');
+        $this->assertNotEmpty($metaNodes, 'get_comment_meta should produce a comment_meta node');
+    }
+
+    // ── Object cache ──────────────────────────────────────────────────────────
+
+    public function testEnterNode_WithWpCacheGet_CreatesCacheReadNode(): void
+    {
+        $this->parse('<?php wp_cache_get("my-key", "my-group");');
+
+        $nodes      = $this->collection->getAllNodes();
+        $cacheNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'cache' && $n->metadata['operation'] === 'read');
+        $this->assertNotEmpty($cacheNodes, 'wp_cache_get should produce a cache read node');
+    }
+
+    public function testEnterNode_WithWpCacheSet_CreatesCacheWriteNode(): void
+    {
+        $this->parse('<?php wp_cache_set("my-key", $value, "my-group");');
+
+        $nodes      = $this->collection->getAllNodes();
+        $cacheNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'cache' && $n->metadata['operation'] === 'write');
+        $this->assertNotEmpty($cacheNodes, 'wp_cache_set should produce a cache write node');
+    }
 }

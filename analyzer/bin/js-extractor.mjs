@@ -60,6 +60,12 @@ try {
 
 const entities = [];
 
+// ── Import tracking for @wordpress/* packages ────────────────────────────────
+// Maps local identifier names → source package, populated during ImportDeclaration pass.
+// e.g. `import { select, dispatch } from '@wordpress/data'` → wpDataImports = {'select', 'dispatch'}
+const wpDataImports  = new Set();
+const wpHooksImports = new Set(); // addAction, addFilter, doAction, applyFilters, removeAction, removeFilter
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function line(node) {
@@ -211,21 +217,55 @@ function walk(node, parent) {
       }
 
       // ── WordPress: wp.hooks.addAction / addFilter (and bare addAction/addFilter) ──
-      else if (name === 'addAction' || name === 'wp.hooks.addAction') {
+      else if (name === 'addAction' || name === 'wp.hooks.addAction'
+               || (wpHooksImports.has('addAction') && name === 'addAction')) {
         const hookName = strVal(args[0]);
         if (hookName) {
           entities.push({ type: 'js_hook', subtype: 'action', name: hookName, line: l, meta: { hook_name: hookName } });
         }
       }
-      else if (name === 'addFilter' || name === 'wp.hooks.addFilter') {
+      else if (name === 'addFilter' || name === 'wp.hooks.addFilter'
+               || (wpHooksImports.has('addFilter') && name === 'addFilter')) {
         const hookName = strVal(args[0]);
         if (hookName) {
           entities.push({ type: 'js_hook', subtype: 'filter', name: hookName, line: l, meta: { hook_name: hookName } });
         }
       }
 
+      // ── WordPress: doAction / applyFilters (triggering hooks from JS) ──
+      else if (name === 'doAction' || name === 'wp.hooks.doAction'
+               || (wpHooksImports.has('doAction') && name === 'doAction')) {
+        const hookName = strVal(args[0]);
+        if (hookName) {
+          entities.push({ type: 'js_hook', subtype: 'action_trigger', name: hookName, line: l, meta: { hook_name: hookName } });
+        }
+      }
+      else if (name === 'applyFilters' || name === 'wp.hooks.applyFilters'
+               || (wpHooksImports.has('applyFilters') && name === 'applyFilters')) {
+        const hookName = strVal(args[0]);
+        if (hookName) {
+          entities.push({ type: 'js_hook', subtype: 'filter_trigger', name: hookName, line: l, meta: { hook_name: hookName } });
+        }
+      }
+
+      // ── WordPress: removeAction / removeFilter ──
+      else if (name === 'removeAction' || name === 'wp.hooks.removeAction'
+               || (wpHooksImports.has('removeAction') && name === 'removeAction')) {
+        const hookName = strVal(args[0]);
+        if (hookName) {
+          entities.push({ type: 'js_hook', subtype: 'action_remove', name: hookName, line: l, meta: { hook_name: hookName } });
+        }
+      }
+      else if (name === 'removeFilter' || name === 'wp.hooks.removeFilter'
+               || (wpHooksImports.has('removeFilter') && name === 'removeFilter')) {
+        const hookName = strVal(args[0]);
+        if (hookName) {
+          entities.push({ type: 'js_hook', subtype: 'filter_remove', name: hookName, line: l, meta: { hook_name: hookName } });
+        }
+      }
+
       // ── WordPress: apiFetch ──
-      else if (name === 'apiFetch') {
+      else if (name === 'apiFetch' || name === 'wp.apiFetch') {
         const opts   = args[0];
         const path   = strVal(objProp(opts, 'path'));
         const method = strVal(objProp(opts, 'method'))?.toUpperCase() ?? 'GET';
@@ -264,6 +304,72 @@ function walk(node, parent) {
           meta: { http_method: method, route: url ?? null } });
       }
 
+      // ── jQuery AJAX: $.ajax / $.get / $.post and jQuery.* equivalents ─────
+      else if (name === '$.ajax' || name === 'jQuery.ajax') {
+        const cfg    = args[0];
+        const method = (strVal(objProp(cfg, 'method')) ?? strVal(objProp(cfg, 'type')) ?? 'GET').toUpperCase();
+        const url    = strVal(objProp(cfg, 'url'));
+        // Try to extract wp ajax action from data.action
+        const dataNode = objProp(cfg, 'data');
+        const action   = dataNode ? strVal(objProp(dataNode, 'action')) : null;
+        const label    = url ? `${method} ${url}` : `${method} (dynamic)`;
+        entities.push({ type: 'fetch_call', subtype: 'jquery', name: label, line: l,
+          meta: { http_method: method, route: url ?? null, wp_action: action } });
+      }
+      else if (name === '$.get' || name === 'jQuery.get') {
+        const url   = strVal(args[0]);
+        const label = url ? `GET ${url}` : 'GET (dynamic)';
+        entities.push({ type: 'fetch_call', subtype: 'jquery', name: label, line: l,
+          meta: { http_method: 'GET', route: url ?? null } });
+      }
+      else if (name === '$.post' || name === 'jQuery.post') {
+        const url    = strVal(args[0]);
+        const data   = args[1];
+        const action = data ? strVal(objProp(data, 'action')) : null;
+        const label  = url ? `POST ${url}` : 'POST (dynamic)';
+        entities.push({ type: 'fetch_call', subtype: 'jquery', name: label, line: l,
+          meta: { http_method: 'POST', route: url ?? null, wp_action: action } });
+      }
+      else if (name === '$.getJSON' || name === 'jQuery.getJSON') {
+        const url   = strVal(args[0]);
+        const label = url ? `GET ${url}` : 'GET (dynamic)';
+        entities.push({ type: 'fetch_call', subtype: 'jquery', name: label, line: l,
+          meta: { http_method: 'GET', route: url ?? null } });
+      }
+
+      // ── WordPress @wordpress/data: select / dispatch (store access) ───────
+      // Detects both wp.data.select('store/name') and named imports from @wordpress/data
+      else if (name === 'wp.data.select'
+               || (name === 'select' && wpDataImports.has('select'))) {
+        const storeName = strVal(args[0]);
+        if (storeName) {
+          entities.push({ type: 'wp_store', subtype: 'read', name: storeName, line: l,
+            meta: { store: storeName } });
+        }
+      }
+      else if (name === 'wp.data.dispatch'
+               || (name === 'dispatch' && wpDataImports.has('dispatch'))) {
+        const storeName = strVal(args[0]);
+        if (storeName) {
+          entities.push({ type: 'wp_store', subtype: 'write', name: storeName, line: l,
+            meta: { store: storeName } });
+        }
+      }
+      else if (name === 'wp.data.useDispatch'
+               || (name === 'useDispatch' && wpDataImports.has('useDispatch'))) {
+        const storeName = strVal(args[0]);
+        if (storeName) {
+          entities.push({ type: 'wp_store', subtype: 'write', name: storeName, line: l,
+            meta: { store: storeName } });
+        }
+      }
+      else if (name === 'wp.data.subscribe'
+               || (name === 'subscribe' && wpDataImports.has('subscribe'))) {
+        // subscribe has no store name arg — just record that the file subscribes to store changes
+        entities.push({ type: 'wp_store', subtype: 'subscribe', name: 'store subscription', line: l,
+          meta: { store: null } });
+      }
+
       // ── React hooks ───────────────────────────────────────────────────────
       else if (name === 'useState') {
         // Find enclosing component name via parent chain — best effort, record at call site
@@ -288,6 +394,22 @@ function walk(node, parent) {
     case 'ImportDeclaration': {
       const src = strVal(node.source);
       if (!src) break;
+      // Track @wordpress/data named imports for store API detection
+      if (src === '@wordpress/data') {
+        for (const spec of node.specifiers ?? []) {
+          if (spec.type === 'ImportSpecifier') {
+            wpDataImports.add(spec.local?.name ?? spec.imported?.name);
+          }
+        }
+      }
+      // Track @wordpress/hooks named imports for hook function detection
+      if (src === '@wordpress/hooks') {
+        for (const spec of node.specifiers ?? []) {
+          if (spec.type === 'ImportSpecifier') {
+            wpHooksImports.add(spec.local?.name ?? spec.imported?.name);
+          }
+        }
+      }
       // Track all non-relative, non-asset imports as dependency edges
       if (!src.startsWith('.') && !src.startsWith('/') && !/\.(css|scss|less|svg|png|jpg|json)$/.test(src)) {
         entities.push({ type: 'js_import', name: src, line: line(node), meta: { source: src } });
