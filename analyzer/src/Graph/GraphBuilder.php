@@ -266,7 +266,14 @@ class GraphBuilder
         // 1. Directory-segment check (excludes the filename itself)
         $dirs = array_slice($parts, 0, count($parts) - 1);
         foreach ($dirs as $segment) {
-            if (in_array(strtolower($segment), self::LIBRARY_SEGMENTS, true)) {
+            $lower = strtolower($segment);
+            if (in_array($lower, self::LIBRARY_SEGMENTS, true)) {
+                return true;
+            }
+            // Versioned library subdirectories: any segment matching `name-N.N[.N]`
+            // (e.g., ext-2.1, jquery-1.11.0, bootstrap-4.0.0) is a vendored third-party
+            // library frozen at a specific version — never developer-written code.
+            if (preg_match('/^[a-z][a-z0-9_-]+-\d+\.\d+/i', $segment)) {
                 return true;
             }
         }

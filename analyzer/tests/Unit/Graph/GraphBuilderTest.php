@@ -356,4 +356,39 @@ class GraphBuilderTest extends TestCase
 
         $this->assertFalse($graph->nodes[0]->isLibrary);
     }
+
+    // ── Versioned library subdirectory detection ───────────────────────────────
+
+    public function testBuild_NodeInVersionedSubdir_IsTaggedIsLibrary(): void
+    {
+        // lib/ext-2.1/ is Ext JS bundled at a specific version — not developer code
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'DomQuery', type: 'js_function', file: '/plugin/interface/lib/ext-2.1/source/core/DomQuery.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInVersionedJquerySubdir_IsTaggedIsLibrary(): void
+    {
+        // A versioned jquery dir bundled inside a plugin's assets
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'ajax', type: 'js_function', file: '/plugin/assets/jquery-1.11.0/jquery.min.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertTrue($graph->nodes[0]->isLibrary);
+    }
+
+    public function testBuild_NodeInFeatureDirWithVersionLookingName_IsNotTaggedIsLibrary(): void
+    {
+        // A developer directory like "my-component-1" does NOT match the pattern (needs x.y)
+        $collection = new EntityCollection();
+        $collection->addNode(Node::make(id: 'a', label: 'Widget', type: 'js_function', file: '/plugin/src/my-component-1/index.js'));
+
+        $graph = $this->builder->build($collection, $this->meta);
+
+        $this->assertFalse($graph->nodes[0]->isLibrary);
+    }
 }
