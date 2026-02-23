@@ -134,4 +134,14 @@ class FileScannerTest extends TestCase
         $basenames = array_map('basename', $jsFiles);
         $this->assertContains('index.js', $basenames, 'Source JS files should still be scanned');
     }
+
+    public function testScan_SkipsJsFilesWithSourceMapFooter(): void
+    {
+        // compiled.js has a `//# sourceMappingURL=` footer — it is a compiled bundle
+        // regardless of its non-minified filename and must be excluded from analysis.
+        $files     = $this->scanner->scan($this->fixtureDir);
+        $basenames = array_map('basename', $files);
+
+        $this->assertNotContains('compiled.js', $basenames, 'Compiled bundle with source-map footer should be excluded');
+    }
 }

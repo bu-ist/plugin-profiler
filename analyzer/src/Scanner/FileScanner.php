@@ -77,7 +77,7 @@ class FileScanner
                 continue;
             }
 
-            if (in_array($extension, self::JS_EXTENSIONS, true) && !$this->isMinifiedFile($basename)) {
+            if (in_array($extension, self::JS_EXTENSIONS, true) && !$this->isMinifiedFile($basename, $realPath)) {
                 $files[] = $realPath;
             }
         }
@@ -286,12 +286,33 @@ class FileScanner
     /**
      * Returns true for minified or compiled bundle files (*.min.js, *.build.js, etc.)
      * that contain mangled single-letter identifiers and produce useless nodes.
+     *
+     * In addition to filename-suffix matching, checks the last 200 bytes of JS files
+     * for a `//# sourceMappingURL=` footer. This catches webpack/browserify/Rollup
+     * bundles that are not named with a `.min.js` or `.bundle.js` suffix (e.g.
+     * `script.js` that is actually compiled output with a source map).
      */
-    private function isMinifiedFile(string $basename): bool
+    private function isMinifiedFile(string $basename, string $fullPath = ''): bool
     {
         foreach (self::MINIFIED_SUFFIXES as $suffix) {
             if (str_ends_with($basename, $suffix)) {
                 return true;
+            }
+        }
+
+        // Source-map footer check: compiled bundles end with `//# sourceMappingURL=`
+        if ($fullPath !== '' && is_readable($fullPath)) {
+            $size = filesize($fullPath);
+            if ($size > 0) {
+                $handle = fopen($fullPath, 'r');
+                if ($handle !== false) {
+                    fseek($handle, max(0, $size - 200));
+                    $tail = fread($handle, 200);
+                    fclose($handle);
+                    if ($tail !== false && str_contains($tail, '//# sourceMappingURL=')) {
+                        return true;
+                    }
+                }
             }
         }
 
