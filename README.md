@@ -10,11 +10,9 @@ Plugin Profiler is a Dockerized static analysis tool that scans a WordPress plug
 
 > _Run the tool against your plugin, then open `http://localhost:9000` to see a graph like this._
 
-| Graph view | Node inspector sidebar |
+| Graph view — BU Calendar (149 nodes) | Node inspector — `BU_Calendar_Plugin` class |
 |---|---|
-| ![Graph view showing nodes and edges](docs/graph-screenshot.png) | ![Sidebar showing entity detail](docs/sidebar-screenshot.png) |
-
-_(Screenshots will appear here after your first run.)_
+| [![Graph view showing 100 of 149 key nodes with fCoSE layout and AI Architecture Overview sidebar](docs/images/overview.png)](docs/images/overview.png) | [![Node inspector sidebar showing AI Insight, file location, and typed connections](docs/images/node-detail.png)](docs/images/node-detail.png) |
 
 ---
 
