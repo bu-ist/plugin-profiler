@@ -172,21 +172,28 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   // Bottom-center placement keeps it out of the graph workspace.
   const banner = document.createElement('div');
   banner.id = 'status-banner';
-  banner.className = 'fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg whitespace-nowrap';
+  banner.className = 'fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg whitespace-nowrap';
   banner.innerHTML = `
     <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
-    <button id="show-all-link" class="text-blue-400 hover:text-blue-300 underline" title="Switch to full graph view">Show all →</button>
-    <button id="banner-dismiss" class="ml-1 text-slate-400 hover:text-white text-sm leading-none" title="Dismiss">✕</button>
+    <button data-banner-action="show-all" class="text-blue-400 hover:text-blue-300 underline" title="Switch to full graph view">Show all →</button>
+    <button data-banner-action="dismiss" class="ml-1 text-slate-400 hover:text-white text-sm leading-none" title="Dismiss">✕</button>
   `;
   document.body.appendChild(banner);
 
-  document.getElementById('show-all-link')?.addEventListener('click', () => {
-    _isFocused = false;
-    switchView();
-  });
-
-  document.getElementById('banner-dismiss')?.addEventListener('click', () => {
-    banner.remove();
+  // Use event delegation on the banner container — same pattern as sidebar-close.
+  // Querying individual child IDs after appendChild can silently fail when the
+  // banner is re-created quickly (e.g. focus toggle), so delegation on the
+  // parent element is more reliable.
+  banner.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-banner-action]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (btn.dataset.bannerAction === 'dismiss') {
+      banner.remove();
+    } else if (btn.dataset.bannerAction === 'show-all') {
+      _isFocused = false;
+      switchView();
+    }
   });
 }
 
