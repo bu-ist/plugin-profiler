@@ -18,12 +18,17 @@ class DescriptionGenerator
     /**
      * Attach AI-generated descriptions to all nodes in the graph (in-place).
      *
+     * Library nodes (isLibrary = true) are skipped — they are bundled
+     * third-party code that developers did not write, so AI descriptions
+     * add no value and waste API credits.
+     *
      * @param callable(int $done, int $total): void|null $onProgress
      */
     public function generate(Graph $graph, ?callable $onProgress = null): void
     {
-        $batches = array_chunk($graph->nodes, $this->batchSize);
-        $total   = count($graph->nodes);
+        $candidates = array_values(array_filter($graph->nodes, fn (Node $n) => !$n->isLibrary));
+        $batches    = array_chunk($candidates, $this->batchSize);
+        $total   = count($candidates);
         $done    = 0;
 
         foreach ($batches as $batch) {
