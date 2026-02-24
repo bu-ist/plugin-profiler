@@ -238,6 +238,19 @@
     ></aside>
   </main>
 
+  <!-- Focus-mode status banner — pre-existing in the DOM so it never battles
+       Cytoscape's stacking context. JS shows/hides and updates the counts. -->
+  <div id="status-banner" role="status" aria-live="polite" aria-atomic="true" hidden
+       style="position:fixed; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:9999; pointer-events:auto; user-select:none;"
+       class="bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded shadow-lg whitespace-nowrap flex items-center">
+    <span id="status-banner-drag" class="flex items-center gap-1 px-3 py-2 cursor-grab" style="pointer-events:auto;" title="Drag to reposition">
+      <span class="text-slate-500 text-[10px] leading-none mr-1" aria-hidden="true">⠿</span>
+      <span id="status-banner-text">⊙ Showing <strong class="text-white">0</strong> of 0 nodes — key nodes by connectivity.</span>
+    </span>
+    <button id="status-banner-show-all" class="text-blue-400 hover:text-blue-300 hover:bg-slate-700/60 underline cursor-pointer px-2 py-2 rounded-r transition-colors" style="pointer-events:auto;" title="Switch to full graph view">Show all →</button>
+    <button id="status-banner-dismiss" class="text-slate-400 hover:text-white hover:bg-slate-700/60 text-sm leading-none cursor-pointer px-2 py-2 transition-colors" style="pointer-events:auto;" title="Dismiss">✕</button>
+  </div>
+
   <!-- Keyboard shortcut hint -->
   <footer class="h-6 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-gray-400 text-xs shrink-0" aria-label="Keyboard shortcuts">
     <kbd aria-label="forward slash">/</kbd>&nbsp;search &nbsp;·&nbsp; <kbd>F</kbd>&nbsp;fit &nbsp;·&nbsp; <kbd>Esc</kbd>&nbsp;close sidebar &nbsp;·&nbsp; <kbd>1–9</kbd>&nbsp;toggle types &nbsp;·&nbsp; double-click node to zoom
