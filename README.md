@@ -12,11 +12,11 @@ Plugin Profiler is a Dockerized static analysis tool that scans a PHP codebase, 
 
 | Graph overview — fCoSE force-directed layout | Node detail — sidebar inspector |
 |---|---|
-| [![Plugin Profiler self-analysis: 660 nodes across classes, hooks, data sources, and files](docs/images/overview.png)](docs/images/overview.png) | [![NamespaceAwareVisitor selected — AI description, connections, docblock, and source preview](docs/images/node-detail.png)](docs/images/node-detail.png) |
+| [![BU Navigation analysis: 515 nodes — classes, hooks, data sources, files, and JS API calls](docs/images/overview.png)](docs/images/overview.png) | [![BU_Navigation_Plugin selected — AI description, 12 connections, docblock, and source preview](docs/images/node-detail.png)](docs/images/node-detail.png) |
 
-| Class hierarchy — extends edges | Requirements view — structural edges |
+| Data flow view — hooks and data edges | Requirements view — structural edges |
 |---|---|
-| [![Visitor inheritance tree: six visitors extending NamespaceAwareVisitor base class](docs/images/node-detail-graph.png)](docs/images/node-detail-graph.png) | [![Requirements view filtering — inheritance, composition, and file-include edges](docs/images/dev-only.png)](docs/images/dev-only.png) |
+| [![Data flow filtering — hook registrations, data source reads/writes, and API calls highlighted](docs/images/node-detail-graph.png)](docs/images/node-detail-graph.png) | [![Requirements view — inheritance, instantiation, and file-include edges](docs/images/dev-only.png)](docs/images/dev-only.png) |
 
 The **Key nodes** view (default) shows the most-connected entities plus one hop of context. Click **All nodes** in the toolbar to reveal the full graph.
 
