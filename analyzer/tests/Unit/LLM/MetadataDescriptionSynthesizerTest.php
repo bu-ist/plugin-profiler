@@ -154,6 +154,30 @@ class MetadataDescriptionSynthesizerTest extends TestCase
         );
     }
 
+    public function testSynthesize_Function_ParamsWithDollarPrefix(): void
+    {
+        $node = Node::make(
+            id: 'func_gdd_output',
+            label: 'gdd_output',
+            type: 'function',
+            file: '/plugin/lib/template.php',
+            metadata: [
+                'params' => [
+                    ['type' => '', 'name' => '$output'],
+                ],
+                'return_type' => null,
+            ],
+        );
+        $graph = $this->buildGraph([$node]);
+
+        $this->synthesizer->synthesize($graph);
+
+        $this->assertSame(
+            'Standalone PHP function accepting 1 parameter ($output).',
+            $node->description
+        );
+    }
+
     // ── Method tests ─────────────────────────────────────────────────────────
 
     public function testSynthesize_Method_WithVisibilityAndParams(): void

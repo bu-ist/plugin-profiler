@@ -484,7 +484,8 @@ class MetadataDescriptionSynthesizer
             if (is_array($param)) {
                 $type = $param['type'] ?? '';
                 $name = $param['name'] ?? '';
-                $details[] = trim("{$type} \${$name}");
+                $displayName = str_starts_with($name, '$') ? $name : "\${$name}";
+                $details[] = trim("{$type} {$displayName}");
             } elseif (is_string($param)) {
                 $details[] = $param;
             }
