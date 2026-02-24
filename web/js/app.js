@@ -2,7 +2,7 @@ import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
 import { initSearch, toggleLibraryFilter, isLibraryFilterActive } from './search.js';
-import { EDGE_VIEW_MODES } from './constants.js';
+import { EDGE_VIEW_MODES, EDGE_TYPE_META } from './constants.js';
 import { escapeHtml } from './utils.js';
 
 // Max nodes to render in Cytoscape. Beyond this the browser hangs.
@@ -245,6 +245,7 @@ function switchView() {
   // Re-apply view mode filter (switchView rebuilds elements without classes)
   applyViewMode();
   updateViewModeCounts();
+  renderLegend();
 }
 
 // ── applyViewMode ─────────────────────────────────────────────────────────────
@@ -304,6 +305,84 @@ function updateViewModeCounts() {
     const base  = view === 'requirements' ? 'Requirements' : 'Data flow';
     btn.textContent = `${base} (${count})`;
   });
+}
+
+// ── Legend panel ─────────────────────────────────────────────────────────────
+
+/**
+ * Build an inline SVG swatch for the legend: a short coloured line with the
+ * correct dash pattern and a filled arrow-shape marker at the right end.
+ */
+function legendSwatch(color, lineStyle, arrowShape) {
+  const dash = lineStyle === 'dashed' ? 'stroke-dasharray="4 3"' : lineStyle === 'dotted' ? 'stroke-dasharray="1.5 2.5"' : '';
+  // Simple marker shapes — just the right visual glyph, not a full Cytoscape replica
+  const markers = {
+    triangle:           `<polygon points="14,6 20,10 14,14" fill="${color}"/>`,
+    vee:                `<polyline points="14,6 20,10 14,14" fill="none" stroke="${color}" stroke-width="2"/>`,
+    diamond:            `<polygon points="17,5 21,10 17,15 13,10" fill="${color}"/>`,
+    square:             `<rect x="14" y="6" width="7" height="8" fill="${color}"/>`,
+    circle:             `<circle cx="17" cy="10" r="4" fill="${color}"/>`,
+    tee:                `<line x1="18" y1="5" x2="18" y2="15" stroke="${color}" stroke-width="2.5"/>`,
+    chevron:            `<polyline points="14,6 20,10 14,14" fill="none" stroke="${color}" stroke-width="2"/>`,
+    'triangle-backcurve': `<polygon points="13,6 20,10 13,14" fill="${color}"/><line x1="15" y1="8" x2="15" y2="12" stroke="#1e293b" stroke-width="1"/>`,
+  };
+  const marker = markers[arrowShape] || markers.triangle;
+  return `<svg width="28" height="20" viewBox="0 0 28 20" class="shrink-0"><line x1="2" y1="10" x2="18" y2="10" stroke="${color}" stroke-width="2" ${dash}/>${marker}</svg>`;
+}
+
+/**
+ * Render the edge legend panel grouped by family, showing only edge types
+ * present in the current graph with their counts.
+ */
+function renderLegend() {
+  const container = document.getElementById('legend-content');
+  if (!container || !_cy) return;
+
+  // Count only visible edges (exclude view-hidden edges filtered by the active mode)
+  const counts = {};
+  _cy.edges().filter(e => !e.hasClass('view-hidden')).forEach(e => {
+    const t = e.data('type') || '';
+    counts[t] = (counts[t] || 0) + 1;
+  });
+
+  // Group EDGE_TYPE_META entries by family, keeping only types with count > 0
+  const families = {};
+  for (const [type, meta] of Object.entries(EDGE_TYPE_META)) {
+    if (!counts[type]) continue;
+    if (!families[meta.family]) families[meta.family] = [];
+    families[meta.family].push({ type, ...meta, count: counts[type] });
+  }
+
+  if (Object.keys(families).length === 0) {
+    container.innerHTML = '<p class="text-slate-500 text-xs">No edges in current view.</p>';
+    return;
+  }
+
+  let html = '';
+  for (const [family, entries] of Object.entries(families)) {
+    html += `<div class="mb-2"><div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">${family}</div>`;
+    for (const e of entries) {
+      const label = e.type.replace(/_/g, ' ');
+      html += `<div class="flex items-center gap-1.5 py-0.5">`;
+      html += legendSwatch(e.color, e.lineStyle, e.arrowShape);
+      html += `<span class="text-xs text-slate-300 truncate">${label}</span>`;
+      html += `<span class="ml-auto text-[10px] text-slate-500">${e.count}</span>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  container.innerHTML = html;
+}
+
+// ── ARIA live announcements ─────────────────────────────────────────────────
+
+/** Push a message to the sr-only live region so screen readers announce it. */
+function announce(msg) {
+  const el = document.getElementById('filter-announce');
+  if (!el) return;
+  el.textContent = msg;
+  // Reset after a short delay so the same message can be re-announced
+  setTimeout(() => { el.textContent = ''; }, 1500);
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -546,6 +625,15 @@ async function main() {
 
   // Populate Requirements / Data flow counts now that _cy is ready
   updateViewModeCounts();
+  renderLegend();
+
+  // Legend toggle button
+  document.getElementById('legend-btn')?.addEventListener('click', () => {
+    const panel = document.getElementById('legend-panel');
+    const btn   = document.getElementById('legend-btn');
+    const open  = panel?.classList.toggle('hidden') === false;
+    btn?.setAttribute('aria-expanded', String(open));
+  });
 
   // Show the Dev-only filter button only when the graph contains library nodes
   const allLibraryNodes = (graphData.nodes || []).filter(n => n.data?.is_library === true);
@@ -583,6 +671,25 @@ async function main() {
     });
 
     applyViewMode();
+    renderLegend();
+
+    // Announce the mode change for screen readers
+    const visibleCount = _cy.edges().filter(e => !e.hasClass('view-hidden')).length;
+    const modeLabel = mode === 'all' ? 'All' : mode === 'requirements' ? 'Requirements' : 'Data flow';
+    announce(`Showing ${modeLabel} edges: ${visibleCount} visible`);
+  });
+
+  // Arrow-key navigation within the view mode toolbar (roving tabindex)
+  document.getElementById('view-mode-btns')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const btns = [...document.querySelectorAll('.view-mode-btn')];
+    const idx  = btns.indexOf(document.activeElement);
+    if (idx < 0) return;
+    e.preventDefault();
+    const next = e.key === 'ArrowRight'
+      ? btns[(idx + 1) % btns.length]
+      : btns[(idx - 1 + btns.length) % btns.length];
+    next.focus();
   });
 
   // Collapse/Expand toggle — requires the expand-collapse extension to be
@@ -628,6 +735,7 @@ async function main() {
     if (btn) btn.classList.toggle('bg-blue-700', hiding);
     if (btn) btn.classList.toggle('bg-gray-700', !hiding);
     if (btn) btn.setAttribute('aria-pressed', String(hiding));
+    announce(hiding ? `Dev only: ${allLibraryNodes.length} library nodes hidden` : 'Dev only off: showing all nodes');
     // In focus mode, rebuild the focus set with/without library nodes
     if (_isFocused) switchView();
   });

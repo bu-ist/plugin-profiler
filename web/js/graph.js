@@ -17,93 +17,122 @@ import { NODE_TYPES } from './constants.js';
 //   selector string → { partial style overrides }
 
 const EDGE_STYLES = [
-  // Inheritance — solid blue (blue-400: bright, readable on dark bg)
+  // Inheritance — solid blue, vee arrow
   {
     selector: 'edge[type="extends"], edge[type="implements"], edge[type="uses_trait"]',
-    style:    { 'line-style': 'solid', 'width': 2.5, 'line-color': '#60A5FA', 'target-arrow-color': '#60A5FA' },
+    style:    { 'line-style': 'solid', 'width': 2.5, 'line-color': '#60A5FA', 'target-arrow-color': '#60A5FA', 'target-arrow-shape': 'vee' },
   },
-  // Instantiation — dotted teal (weaker dependency than inheritance)
+  // Instantiation — dotted teal, diamond arrow
   {
     selector: 'edge[type="instantiates"]',
-    style:    { 'line-style': 'dotted', 'width': 2, 'line-color': '#2DD4BF', 'target-arrow-color': '#2DD4BF' },
+    style:    { 'line-style': 'dotted', 'width': 2, 'line-color': '#2DD4BF', 'target-arrow-color': '#2DD4BF', 'target-arrow-shape': 'diamond' },
   },
-  // JS module imports — dashed slate-blue (softer than class edges; JS file-to-file)
+  // JS module imports — dashed indigo, chevron arrow
   {
     selector: 'edge[type="imports"]',
-    style:    { 'line-style': 'dashed', 'width': 1.5, 'line-color': '#818CF8', 'target-arrow-color': '#818CF8' },
+    style:    { 'line-style': 'dashed', 'width': 1.5, 'line-color': '#818CF8', 'target-arrow-color': '#818CF8', 'target-arrow-shape': 'chevron' },
   },
-  // WordPress hooks — dashed orange (orange-400)
+  // Function/method calls — solid slate, triangle arrow (default structural colour)
+  {
+    selector: 'edge[type="calls"]',
+    style:    { 'width': 2, 'line-color': '#94A3B8', 'target-arrow-color': '#94A3B8', 'target-arrow-shape': 'triangle' },
+  },
+  // Structural: has_method, includes, defines — dotted/dashed slate, triangle arrow
+  {
+    selector: 'edge[type="has_method"], edge[type="defines"]',
+    style:    { 'line-style': 'dotted', 'width': 1.5, 'line-color': '#94A3B8', 'target-arrow-color': '#94A3B8', 'target-arrow-shape': 'triangle' },
+  },
+  {
+    selector: 'edge[type="includes"]',
+    style:    { 'line-style': 'dashed', 'width': 1.5, 'line-color': '#94A3B8', 'target-arrow-color': '#94A3B8', 'target-arrow-shape': 'triangle' },
+  },
+  // React component definition — solid cyan, triangle arrow
+  {
+    selector: 'edge[type="defines_component"]',
+    style:    { 'width': 2, 'line-color': '#06B6D4', 'target-arrow-color': '#06B6D4', 'target-arrow-shape': 'triangle' },
+  },
+  // JS HTTP calls (fetch/axios → http_call node) — solid red, tee arrow
+  {
+    selector: 'edge[type="http_call"]',
+    style:    { 'width': 2.5, 'line-color': '#F87171', 'target-arrow-color': '#F87171', 'target-arrow-shape': 'tee' },
+  },
+  // JS block registration — dashed pink, circle arrow
+  {
+    selector: 'edge[type="registers_block"]',
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
+  },
+  // WordPress hooks — dashed orange, triangle arrow
   {
     selector: 'edge[type="registers_hook"], edge[type="triggers_hook"], edge[type="js_registers_hook"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C', 'target-arrow-shape': 'triangle' },
   },
-  // Hook trigger to handler — solid orange (orange-400)
+  // Hook trigger to handler — solid orange, triangle arrow
   {
     selector: 'edge[type="triggers_handler"]',
-    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C', 'target-arrow-shape': 'triangle' },
   },
-  // Data reads — solid purple (purple-400)
+  // Data reads — solid purple, square arrow
   {
     selector: 'edge[type="reads_data"]',
-    style:    { 'width': 2.5, 'line-color': '#C084FC', 'target-arrow-color': '#C084FC' },
+    style:    { 'width': 2.5, 'line-color': '#C084FC', 'target-arrow-color': '#C084FC', 'target-arrow-shape': 'square' },
   },
-  // Data writes — dashed purple (writes are "heavier" than reads)
+  // Data writes — dashed purple, square arrow
   {
     selector: 'edge[type="writes_data"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#C084FC', 'target-arrow-color': '#C084FC' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#C084FC', 'target-arrow-color': '#C084FC', 'target-arrow-shape': 'square' },
   },
-  // Outbound HTTP — red (red-400)
+  // Outbound HTTP — red, tee arrow
   {
     selector: 'edge[type="http_request"]',
-    style:    { 'width': 2.5, 'line-color': '#F87171', 'target-arrow-color': '#F87171' },
+    style:    { 'width': 2.5, 'line-color': '#F87171', 'target-arrow-color': '#F87171', 'target-arrow-shape': 'tee' },
   },
-  // Block rendering and asset enqueueing — dotted pink (pink-400)
+  // Block rendering and asset enqueueing — dotted pink, circle arrow
   {
     selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
-    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
   },
-  // Registration edges — dashed green (green-400)
+  // Registration edges — dashed green, triangle-backcurve arrow
   {
     selector: 'edge[type="registers"], edge[type="registers_rest"], edge[type="registers_shortcode"], edge[type="registers_page"], edge[type="registers_ajax"], edge[type="schedules_cron"], edge[type="registers_post_type"], edge[type="registers_taxonomy"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80', 'target-arrow-shape': 'triangle-backcurve' },
   },
-  // JS hook usage (file → js_hook) — same orange family as PHP hooks
+  // JS hook usage (file → js_hook) — dotted orange, triangle arrow
   {
     selector: 'edge[type="uses_hook"]',
-    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C' },
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#FB923C', 'target-arrow-color': '#FB923C', 'target-arrow-shape': 'triangle' },
   },
-  // JS apiFetch calls (file → js_api_call node) — green, same REST family
+  // JS apiFetch calls (file → js_api_call node) — solid green, triangle-backcurve arrow
   {
     selector: 'edge[type="js_api_call"]',
-    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#4ADE80', 'target-arrow-color': '#4ADE80', 'target-arrow-shape': 'triangle-backcurve' },
   },
-  // Cross-language JS→PHP edges — solid/dashed pink (the tool's unique signal)
+  // Cross-language JS→PHP edges — pink, circle arrow
   {
     selector: 'edge[type="calls_endpoint"]',
-    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
   },
   {
     selector: 'edge[type="calls_ajax_handler"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
   },
   {
     selector: 'edge[type="js_block_matches_php"]',
-    style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6' },
+    style:    { 'width': 2, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
   },
-  // Hook deregistration — dashed red (signals removal / teardown)
+  // Hook deregistration — dashed red, tee arrow
   {
     selector: 'edge[type="deregisters_hook"]',
-    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#F87171', 'target-arrow-color': '#F87171' },
+    style:    { 'width': 2, 'line-style': 'dashed', 'line-color': '#F87171', 'target-arrow-color': '#F87171', 'target-arrow-shape': 'tee' },
   },
-  // WordPress data store reads — solid amber (reads_store like reads_data but amber)
+  // WordPress data store reads — solid amber, diamond arrow
   {
     selector: 'edge[type="reads_store"]',
-    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D' },
+    style:    { 'width': 2.5, 'line-style': 'solid', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D', 'target-arrow-shape': 'diamond' },
   },
-  // WordPress data store writes — dashed amber (writes_store like writes_data but amber)
+  // WordPress data store writes — dashed amber, diamond arrow
   {
     selector: 'edge[type="writes_store"]',
-    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D' },
+    style:    { 'width': 2.5, 'line-style': 'dashed', 'line-color': '#FCD34D', 'target-arrow-color': '#FCD34D', 'target-arrow-shape': 'diamond' },
   },
 ];
 
@@ -141,8 +170,8 @@ function buildStylesheet() {
         'border-width':      2,
         'border-color':      'rgba(255,255,255,0.25)',
         'background-color':  '#6B7280',
-        'transition-property':  'background-color, border-color, opacity',
-        'transition-duration':  '150ms',
+        'transition-property':  'background-color, border-color, opacity, text-opacity',
+        'transition-duration':  '200ms',
       },
     },
     // ── Interface: dashed border signals "abstract contract" ─────────────
@@ -157,6 +186,16 @@ function buildStylesheet() {
     },
     // ── Per-type colour + shape ───────────────────────────────────────────
     ...typeRules,
+    // ── Library nodes: dotted border + muted opacity ─────────────────────
+    {
+      selector: 'node[?is_library]',
+      style: {
+        'border-style': 'dotted',
+        'border-width':  2,
+        'border-color': 'rgba(255,255,255,0.15)',
+        'opacity':       0.7,
+      },
+    },
     // ── Compound namespace groups (PHP) ───────────────────────────────────
     {
       selector: 'node[type="namespace"]',
@@ -291,6 +330,11 @@ export function initCytoscape(container, elements, onNodeClick, onNodeHover, onN
     wheelSensitivity: 0.3,
     ...rendererOpts,
   });
+
+  // Honour prefers-reduced-motion: disable CSS transitions on nodes
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    cy.style().selector('node').style('transition-duration', '0ms').update();
+  }
 
   // ── Interaction handlers ─────────────────────────────────────────────────
 
