@@ -2,7 +2,7 @@ import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
 import { initSearch, toggleLibraryFilter, isLibraryFilterActive, resetSearchExpansion } from './search.js';
-import { EDGE_VIEW_MODES, EDGE_TYPE_META } from './constants.js';
+import { EDGE_VIEW_MODES, EDGE_TYPE_META, USER_FACING_TYPES } from './constants.js';
 import { escapeHtml } from './utils.js';
 
 // Max nodes to render in Cytoscape. Beyond this the browser hangs.
@@ -137,7 +137,56 @@ function buildFocusSet(allNodes, allEdges, pluginMeta, hideLibrary = false) {
     e => focusIds.has(e.data.source) && focusIds.has(e.data.target)
   );
 
-  return { nodes, edges, focusCount: nodes.length, totalCount: leafNodes.length };
+  return { nodes, edges, focusCount: nodes.length, totalCount: leafNodes.length, primaryIds: primary };
+}
+
+// ── Importance scoring ──────────────────────────────────────────────────────
+
+/**
+ * Score node importance using Cytoscape.js built-in PageRank + software bonuses.
+ * Mutates node.data() in-place: sets `importance` (0–1 float) and
+ * `importance_tier` ('key' | 'standard' | 'supporting').
+ *
+ * Must be called AFTER nodes are added to the Cytoscape instance (PageRank
+ * needs the live graph topology) and BEFORE layout runs (fCoSE reads tier
+ * data for per-node repulsion).
+ *
+ * @param {cytoscape.Core} cy          - The Cytoscape instance with focus nodes loaded.
+ * @param {Object}         pluginMeta  - plugin block from graph-data.json.
+ * @param {Set<string>}    primaryIds  - IDs of the primary seed nodes from buildFocusSet.
+ */
+function scoreImportance(cy, pluginMeta, primaryIds) {
+  const nodes = cy.nodes();
+  if (nodes.length === 0) return;
+
+  // Step 1: PageRank — transitive structural importance.
+  // dampingFactor 0.85 is the standard value (original Google paper).
+  // Returns an object where pr.rank(node) gives a 0–1 float.
+  const pr = cy.elements().pageRank({ dampingFactor: 0.85 });
+
+  // Step 2: Composite score = PageRank + domain-specific bonuses
+  const mainFile = pluginMeta?.main_file;
+  let maxScore   = 0;
+  const scores   = [];
+
+  nodes.forEach(node => {
+    let score = pr.rank(node);                                          // structural
+    if (primaryIds && primaryIds.has(node.data('id')))    score += 0.15; // seed bonus
+    if (mainFile && node.data('file')?.endsWith(mainFile)) score += 0.25; // entry point
+    if (USER_FACING_TYPES.has(node.data('type')))          score += 0.10; // public API
+    scores.push({ node, score });
+    if (score > maxScore) maxScore = score;
+  });
+
+  // Step 3: Normalize to 0–1 and assign tiers
+  scores.forEach(({ node, score }) => {
+    const normalized = maxScore > 0 ? score / maxScore : 0;
+    let tier = 'supporting';
+    if (normalized >= 0.6)      tier = 'key';
+    else if (normalized >= 0.2) tier = 'standard';
+    node.data('importance', normalized);
+    node.data('importance_tier', tier);
+  });
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
@@ -333,6 +382,7 @@ function switchView() {
     if (_isFocused) {
       const f = buildFocusSet(_allNodes, _allEdges, _pluginMeta, isLibraryFilterActive());
       _cy.add([...f.nodes, ...f.edges]);
+      scoreImportance(_cy, _pluginMeta, f.primaryIds);
       updateFocusButton(f.focusCount, f.totalCount);
       showStatusBanner(f.focusCount, f.totalCount, true);
     } else {
@@ -822,6 +872,11 @@ async function main() {
 
   // Show AI summary as the default sidebar state when available
   openPluginSummary(p);
+
+  // Score node importance using PageRank + software bonuses.
+  // Must run after nodes are in cy (PageRank needs the graph) and before layout
+  // (fCoSE reads importance_tier for per-node repulsion).
+  scoreImportance(_cy, _pluginMeta, focused.primaryIds);
 
   // Auto-select layout for the focus set (small, sparse → always fCoSE)
   const maxEdges   = focused.nodes.length > 1

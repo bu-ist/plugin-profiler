@@ -241,3 +241,14 @@ export const nodeShape = (type) => NODE_TYPES[type]?.shape ?? 'ellipse';
 
 /** Return the Tailwind badge/button class string for a node type (fallback: gray). */
 export const nodeBadge = (type) => NODE_TYPES[type]?.badge ?? 'bg-gray-500';
+
+/**
+ * Node types that represent user-facing / public-API surface of a plugin.
+ * Used by scoreImportance() to boost nodes that are architecturally significant
+ * because they define the plugin's external interface.
+ */
+export const USER_FACING_TYPES = new Set([
+  'hook', 'js_hook', 'rest_endpoint', 'ajax_handler',
+  'shortcode', 'admin_page', 'cron_job', 'post_type',
+  'taxonomy', 'gutenberg_block',
+]);

@@ -201,6 +201,33 @@ function buildStylesheet() {
         'opacity':       0.7,
       },
     },
+    // ── Key node emphasis (focus mode) ───────────────────────────────────
+    // PageRank-scored key nodes: larger, bolder, amber glow border.
+    {
+      selector: 'node[importance_tier="key"]',
+      style: {
+        'padding':      '22px',
+        'min-width':    '90px',
+        'min-height':   '40px',
+        'font-size':    '15px',
+        'font-weight':  'bold',
+        'border-width': 3,
+        'border-color': 'rgba(251, 191, 36, 0.6)',  // amber glow
+        'z-index':      5,
+      },
+    },
+    // Supporting nodes: smaller, muted — recede to visual periphery.
+    {
+      selector: 'node[importance_tier="supporting"]',
+      style: {
+        'padding':    '10px',
+        'min-width':  '44px',
+        'min-height': '22px',
+        'font-size':  '11px',
+        'opacity':    0.75,
+        'z-index':    1,
+      },
+    },
     // ── Compound namespace groups (PHP) ───────────────────────────────────
     {
       selector: 'node[type="namespace"]',

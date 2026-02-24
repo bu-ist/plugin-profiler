@@ -133,5 +133,24 @@ export function applyLayout(cy, name) {
   if (count > LARGE_GRAPH) {
     config.animate = false;
   }
+
+  // When importance tiers exist (focus mode), key nodes repel more so they
+  // claim central space; supporting nodes yield and drift to the periphery.
+  if (name === 'fcose' && cy.nodes('[importance_tier="key"]').length > 0) {
+    config.nodeRepulsion = (node) => {
+      const tier = node.data('importance_tier');
+      if (tier === 'key')        return 6000;   // 3× base — claims central space
+      if (tier === 'supporting') return 1200;   // 0.6× base — yields to periphery
+      return 2000;                               // standard — base repulsion
+    };
+    config.idealEdgeLength = (edge) => {
+      const sTier = cy.getElementById(edge.data('source')).data('importance_tier');
+      const tTier = cy.getElementById(edge.data('target')).data('importance_tier');
+      if (sTier === 'key' && tTier === 'key') return 35;   // tight central cluster
+      if (sTier === 'supporting' || tTier === 'supporting') return 65;  // push periphery out
+      return 50;                                             // standard distance
+    };
+  }
+
   cy.layout(config).run();
 }
