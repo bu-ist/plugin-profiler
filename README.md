@@ -12,11 +12,11 @@ Plugin Profiler is a Dockerized static analysis tool that scans a PHP codebase, 
 
 | Graph overview — fCoSE force-directed layout | Node detail — sidebar inspector |
 |---|---|
-| [![Plugin Profiler self-analysis: 653 nodes in compound namespace groups with fCoSE layout](docs/images/overview.png)](docs/images/overview.png) | [![Node detail panel showing type badge, AI description, connections, and source preview](docs/images/node-detail.png)](docs/images/node-detail.png) |
+| [![Plugin Profiler self-analysis: 660 nodes across classes, hooks, data sources, and files](docs/images/overview.png)](docs/images/overview.png) | [![NamespaceAwareVisitor selected — AI description, connections, docblock, and source preview](docs/images/node-detail.png)](docs/images/node-detail.png) |
 
-| Data flow view | Requirements view |
+| Class hierarchy — extends edges | Requirements view — structural edges |
 |---|---|
-| [![Data view filtering — hooks, database operations, REST/AJAX registration edges highlighted](docs/images/node-detail-graph.png)](docs/images/node-detail-graph.png) | [![Requirements view — inheritance, composition, and file-include structural edges](docs/images/dev-only.png)](docs/images/dev-only.png) |
+| [![Visitor inheritance tree: six visitors extending NamespaceAwareVisitor base class](docs/images/node-detail-graph.png)](docs/images/node-detail-graph.png) | [![Requirements view filtering — inheritance, composition, and file-include edges](docs/images/dev-only.png)](docs/images/dev-only.png) |
 
 The **Key nodes** view (default) shows the most-connected entities plus one hop of context. Click **All nodes** in the toolbar to reveal the full graph.
 
