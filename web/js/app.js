@@ -172,8 +172,11 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   const banner = document.getElementById('status-banner');
   if (!banner) return;
 
-  // Hide completely only when focus set === full set (small plugin)
-  if (focusCount >= totalCount && !isFocused) {
+  // Hide only when the focus set already covers every node (small plugin
+  // where there is no difference between focused and full view).
+  // When the user explicitly switched to show-all (_isFocused === false),
+  // the banner must stay visible so they can click "Focus ←" to go back.
+  if (focusCount >= totalCount && isFocused) {
     banner.style.display = 'none';
     _bannerState = 'hidden';
     return;
