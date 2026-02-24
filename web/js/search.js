@@ -12,6 +12,8 @@ let _cy = null;
 let _activeTypes = new Set();
 let _allNodes = null;  // full node list (may exceed rendered set)
 let _hideLibrary = false;
+let _fitTimer = null;       // debounce timer for search-triggered fit
+let _savedViewport = null;  // viewport before search began
 
 export function initSearch(cy, allNodes = null) {
   _cy = cy;
@@ -58,7 +60,7 @@ function bindSearchInput() {
     if (e.key === 'Escape') {
       input.value = '';
       input.blur();
-      applyFilters();
+      applyFilters(); // restores viewport via _savedViewport
     }
   });
 }
@@ -104,6 +106,7 @@ export function applyFilters() {
 
   const query = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
 
+  let visibleCount = 0;
   _cy.batch(() => {
     _cy.nodes().forEach((node) => {
       const type = node.data('type');
@@ -115,6 +118,7 @@ export function applyFilters() {
       if (typeVisible && searchMatch && libraryVisible) {
         node.style('display', 'element');
         node.removeClass('dimmed');
+        if (query) visibleCount++;
       } else {
         node.style('display', 'none');
       }
@@ -128,6 +132,28 @@ export function applyFilters() {
       edge.style('display', visible ? 'element' : 'none');
     });
   });
+
+  // Auto-fit to visible search results (debounced to avoid jarring per-keystroke fits)
+  if (query && visibleCount > 0) {
+    if (!_savedViewport) {
+      _savedViewport = { zoom: _cy.zoom(), pan: { ..._cy.pan() } };
+    }
+    clearTimeout(_fitTimer);
+    _fitTimer = setTimeout(() => {
+      const visible = _cy.nodes().filter(n => n.style('display') !== 'none');
+      if (visible.length > 0) {
+        _cy.fit(visible, 60);
+      }
+    }, 300);
+  } else if (!query && _savedViewport) {
+    // Restore viewport when search is cleared
+    clearTimeout(_fitTimer);
+    _cy.viewport({ zoom: _savedViewport.zoom, pan: _savedViewport.pan });
+    _savedViewport = null;
+  }
+
+  // Update match count indicator
+  updateMatchCount(query, visibleCount);
 }
 
 function populateAutocomplete() {
@@ -149,6 +175,25 @@ function populateAutocomplete() {
     opt.value = label;
     datalist.appendChild(opt);
   });
+}
+
+function updateMatchCount(query, count) {
+  let badge = document.getElementById('search-match-count');
+  if (!badge) {
+    const wrap = document.getElementById('search-input')?.parentElement;
+    if (!wrap) return;
+    badge = document.createElement('span');
+    badge.id = 'search-match-count';
+    wrap.appendChild(badge);
+  }
+  if (query) {
+    badge.textContent = `${count}`;
+    const color = count > 0 ? 'text-slate-400' : 'text-red-400';
+    badge.className = `absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${color}`;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function bindKeyboardShortcuts() {
