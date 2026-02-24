@@ -47,9 +47,27 @@
     .type-filter-btn.opacity-30 {
       opacity: 0.3;
     }
+    /* Visually-hidden helper — content for screen readers only */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
   </style>
 </head>
 <body class="h-full w-full flex flex-col overflow-hidden">
+
+  <!-- Skip navigation link — visible on keyboard focus, hidden otherwise -->
+  <a href="#main-content"
+     class="sr-only focus:not-sr-only focus:fixed focus:top-0 focus:left-0 focus:z-[1000] focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-br focus:text-sm focus:outline-none">
+    Skip to main content
+  </a>
 
   <!-- Loading overlay — shown while data is fetched and graph is built -->
   <div id="loading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 transition-opacity duration-300">
@@ -58,12 +76,14 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
-      <p id="loading-status" class="text-gray-400 text-sm tracking-wide">Loading graph data…</p>
+      <p id="loading-status" role="status" aria-live="polite" class="text-gray-400 text-sm tracking-wide">Loading graph data…</p>
     </div>
   </div>
 
   <!-- Toolbar -->
   <header class="bg-gray-800 border-b border-gray-700 flex flex-col shrink-0">
+  <!-- Page title — visually hidden but announces the app to screen readers -->
+  <h1 class="sr-only">Plugin Profiler</h1>
   <div class="h-12 flex items-center gap-3 px-4">
     <div class="flex items-center gap-2 mr-2 shrink-0">
       <span class="text-pink-400 font-bold text-sm">&#x25CE;</span>
@@ -71,9 +91,9 @@
         <div class="flex items-center gap-1">
           <span id="plugin-name" class="font-semibold text-sm truncate max-w-[180px]">Plugin Profiler</span>
           <span id="plugin-version" class="text-gray-400 text-xs shrink-0"></span>
-          <button id="reanalyze-btn" class="hidden text-slate-500 hover:text-white text-sm leading-none" title="Re-analyze a different path">↻</button>
+          <button id="reanalyze-btn" class="hidden text-slate-400 hover:text-white text-sm leading-none focus:outline-none focus:ring-2 focus:ring-blue-400 rounded" title="Re-analyze a different path" aria-label="Re-analyze plugin" aria-expanded="false" aria-controls="reanalyze-panel">↻</button>
         </div>
-        <span id="plugin-path" class="hidden text-[10px] text-slate-600 font-mono truncate max-w-[260px]" title="Analyzed plugin path"></span>
+        <span id="plugin-path" class="hidden text-[10px] text-slate-400 font-mono truncate max-w-[260px]" title="Analyzed plugin path"></span>
       </div>
     </div>
 
@@ -96,9 +116,11 @@
       <span id="plugin-stats" class="text-gray-400 text-xs"></span>
 
       <!-- Layout -->
+      <label for="layout-select" class="sr-only">Layout algorithm</label>
       <select
         id="layout-select"
-        class="bg-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        aria-label="Layout algorithm"
+        class="bg-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
       >
         <option value="dagre">Dagre (hierarchy)</option>
         <option value="fcose" selected>fCoSE (force)</option>
@@ -134,18 +156,18 @@
       </div>
 
       <!-- Collapse/Expand all namespace groups -->
-      <button id="collapse-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Collapse / Expand all groups">⊟ Groups</button>
+      <button id="collapse-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" title="Collapse / Expand all groups" aria-pressed="false">⊟ Groups</button>
 
       <!-- Focus / Show-all toggle -->
-      <button id="focus-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Toggle between key nodes and full graph"><span id="focus-label">⊙ Key nodes</span></button>
+      <button id="focus-btn" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" title="Toggle between key nodes and full graph" aria-pressed="true"><span id="focus-label">⊙ Key nodes</span></button>
 
       <!-- Library filter: hide bundled third-party code -->
-      <button id="lib-filter-btn" class="hidden text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Show or hide bundled library code"><span id="lib-filter-label">⚙ Dev only</span></button>
+      <button id="lib-filter-btn" class="hidden text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" title="Show or hide bundled library code" aria-pressed="false"><span id="lib-filter-label">⚙ Dev only</span></button>
 
       <!-- Zoom controls -->
-      <button id="zoom-in"  class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom In">+</button>
-      <button id="zoom-out" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm" title="Zoom Out">−</button>
-      <button id="zoom-fit" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs" title="Fit (F)">Fit</button>
+      <button id="zoom-in"  class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" title="Zoom In" aria-label="Zoom in">+</button>
+      <button id="zoom-out" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" title="Zoom Out" aria-label="Zoom out">−</button>
+      <button id="zoom-fit" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" title="Fit (F)" aria-label="Fit graph (F)">Fit</button>
     </div>
   </div>
   <!-- Type filter buttons — second row, shown after graph loads -->
@@ -153,29 +175,37 @@
   </header>
 
   <!-- Re-analyze panel — hidden by default, shown when ↻ is clicked -->
-  <div id="reanalyze-panel" class="hidden fixed top-12 left-1/2 -translate-x-1/2 z-[300] bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 flex items-center gap-2 w-[540px]">
+  <div id="reanalyze-panel"
+       role="dialog"
+       aria-modal="true"
+       aria-label="Re-analyze plugin"
+       class="hidden fixed top-12 left-1/2 -translate-x-1/2 z-[300] bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 flex items-center gap-2 w-[540px]">
+    <label for="reanalyze-path" class="sr-only">Plugin path to analyze</label>
     <input id="reanalyze-path" type="text" placeholder="/absolute/path/to/plugin"
-      class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500" />
-    <button id="reanalyze-submit" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium shrink-0">Analyze</button>
-    <button id="reanalyze-cancel" class="px-2 py-1.5 text-slate-400 hover:text-white text-sm leading-none shrink-0">✕</button>
-    <span id="reanalyze-status" class="hidden text-xs text-slate-400 shrink-0"></span>
+      aria-describedby="reanalyze-status"
+      class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" />
+    <button id="reanalyze-submit" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-400">Analyze</button>
+    <button id="reanalyze-cancel" class="px-2 py-1.5 text-slate-400 hover:text-white text-sm leading-none shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-400" aria-label="Cancel re-analysis">✕</button>
+    <span id="reanalyze-status" role="status" aria-live="polite" class="hidden text-xs text-slate-400 shrink-0"></span>
   </div>
 
   <!-- Main layout (always in DOM so Cytoscape can size itself) -->
-  <div id="main-layout" class="flex-1 flex min-h-0">
+  <main id="main-content" class="flex-1 flex min-h-0">
     <!-- Graph canvas -->
-    <div id="cy" class="flex-1 bg-gray-950"></div>
+    <div id="cy" role="application" aria-label="Plugin dependency graph" class="flex-1 bg-gray-950" tabindex="0"></div>
 
     <!-- Sidebar -->
     <aside
       id="sidebar"
+      aria-label="Node inspector"
+      aria-hidden="true"
       class="hidden flex-col bg-gray-800 border-l border-gray-700 p-4 overflow-y-auto text-sm"
     ></aside>
-  </div>
+  </main>
 
   <!-- Keyboard shortcut hint -->
-  <footer class="h-6 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-gray-500 text-xs shrink-0">
-    <kbd>/</kbd>&nbsp;search &nbsp;·&nbsp; <kbd>F</kbd>&nbsp;fit &nbsp;·&nbsp; <kbd>Esc</kbd>&nbsp;close sidebar &nbsp;·&nbsp; <kbd>1-9</kbd>&nbsp;toggle types &nbsp;·&nbsp; double-click node to zoom
+  <footer class="h-6 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-gray-400 text-xs shrink-0" aria-label="Keyboard shortcuts">
+    <kbd aria-label="forward slash">/</kbd>&nbsp;search &nbsp;·&nbsp; <kbd>F</kbd>&nbsp;fit &nbsp;·&nbsp; <kbd>Esc</kbd>&nbsp;close sidebar &nbsp;·&nbsp; <kbd>1–9</kbd>&nbsp;toggle types &nbsp;·&nbsp; double-click node to zoom
   </footer>
 
   <!-- App entry point -->

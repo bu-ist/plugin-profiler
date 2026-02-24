@@ -62,10 +62,11 @@ function buildTypeFilters(allTypes) {
   [...allTypes].sort().forEach((type, i) => {
     const btn = document.createElement('button');
     const colorClass = nodeBadge(type);
-    btn.className = `type-filter-btn px-2 py-0.5 rounded text-xs text-white font-medium ${colorClass} opacity-100 transition-opacity`;
+    btn.className = `type-filter-btn px-2 py-0.5 rounded text-xs font-medium ${colorClass} opacity-100 transition-opacity focus:outline-none focus:ring-2 focus:ring-white`;
     btn.textContent = type.replace(/_/g, ' ');
     btn.dataset.type = type;
     btn.title = `Toggle ${type} nodes (${i + 1})`;
+    btn.setAttribute('aria-pressed', 'true');
 
     btn.addEventListener('click', () => toggleType(type, btn));
     container.appendChild(btn);
@@ -79,9 +80,11 @@ function toggleType(type, btn) {
   if (_activeTypes.has(type)) {
     _activeTypes.delete(type);
     btn.classList.add('opacity-30');
+    btn.setAttribute('aria-pressed', 'false');
   } else {
     _activeTypes.add(type);
     btn.classList.remove('opacity-30');
+    btn.setAttribute('aria-pressed', 'true');
   }
   applyFilters();
 }

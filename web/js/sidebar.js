@@ -30,6 +30,7 @@ export function openPluginSummary(plugin) {
   sidebar.innerHTML = buildPluginSummaryHtml(plugin);
   sidebar.classList.remove('hidden');
   sidebar.classList.add('flex');
+  sidebar.removeAttribute('aria-hidden');
 }
 
 export function openSidebar(nodeData) {
@@ -39,6 +40,7 @@ export function openSidebar(nodeData) {
   sidebar.innerHTML = buildSidebarHtml(nodeData);
   sidebar.classList.remove('hidden');
   sidebar.classList.add('flex');
+  sidebar.removeAttribute('aria-hidden');
 
   // Re-highlight code after rendering
   if (window.Prism) {
@@ -78,6 +80,7 @@ export function closeSidebar() {
   if (!sidebar) return;
   sidebar.classList.add('hidden');
   sidebar.classList.remove('flex');
+  sidebar.setAttribute('aria-hidden', 'true');
 }
 
 /**

@@ -176,6 +176,9 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   // Bottom-center placement keeps it out of the graph workspace.
   const banner = document.createElement('div');
   banner.id = 'status-banner';
+  banner.setAttribute('role', 'status');
+  banner.setAttribute('aria-live', 'polite');
+  banner.setAttribute('aria-atomic', 'true');
   banner.className = 'fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg whitespace-nowrap';
   banner.innerHTML = `
     <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
@@ -353,15 +356,54 @@ async function main() {
 
   // Re-analyze panel
   const CONTROLLER_URL = 'http://localhost:9001';
-  document.getElementById('reanalyze-btn')?.addEventListener('click', () => {
+
+  function openReanalyzePanel() {
     const panel = document.getElementById('reanalyze-panel');
     const input = document.getElementById('reanalyze-path');
     if (input) input.value = hostPath || '';
     document.getElementById('reanalyze-status')?.classList.add('hidden');
-    panel?.classList.toggle('hidden');
-  });
-  document.getElementById('reanalyze-cancel')?.addEventListener('click', () => {
+    panel?.classList.remove('hidden');
+    document.getElementById('reanalyze-btn')?.setAttribute('aria-expanded', 'true');
+    // Focus the path input once panel is visible
+    setTimeout(() => input?.focus(), 50);
+  }
+
+  function closeReanalyzePanel() {
     document.getElementById('reanalyze-panel')?.classList.add('hidden');
+    document.getElementById('reanalyze-btn')?.setAttribute('aria-expanded', 'false');
+    document.getElementById('reanalyze-btn')?.focus();
+  }
+
+  document.getElementById('reanalyze-btn')?.addEventListener('click', () => {
+    const panel = document.getElementById('reanalyze-panel');
+    if (panel?.classList.contains('hidden')) {
+      openReanalyzePanel();
+    } else {
+      closeReanalyzePanel();
+    }
+  });
+
+  // Focus trap + Escape key for the dialog
+  document.getElementById('reanalyze-panel')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeReanalyzePanel();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const panel    = document.getElementById('reanalyze-panel');
+    const focusable = [...panel.querySelectorAll('button:not([disabled]), input:not([disabled])')];
+    const first    = focusable[0];
+    const last     = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  document.getElementById('reanalyze-cancel')?.addEventListener('click', () => {
+    closeReanalyzePanel();
   });
   document.getElementById('reanalyze-submit')?.addEventListener('click', async () => {
     const path      = document.getElementById('reanalyze-path')?.value.trim();
@@ -474,6 +516,7 @@ async function main() {
   // Focus/Show-all toggle button
   document.getElementById('focus-btn')?.addEventListener('click', () => {
     _isFocused = !_isFocused;
+    document.getElementById('focus-btn')?.setAttribute('aria-pressed', String(_isFocused));
     switchView();
   });
 
@@ -520,12 +563,13 @@ async function main() {
     // visible children so :parent would not match them, making the toggle
     // unable to detect the collapsed state.
     const anyCollapsed = groupNodes.some((n) => api.isCollapsed(n));
+    const btn = document.getElementById('collapse-btn');
     if (anyCollapsed) {
       api.expandAll();
-      document.getElementById('collapse-btn').textContent = '⊟ Groups';
+      if (btn) { btn.textContent = '⊟ Groups'; btn.setAttribute('aria-pressed', 'false'); }
     } else {
       api.collapseAll();
-      document.getElementById('collapse-btn').textContent = '⊞ Groups';
+      if (btn) { btn.textContent = '⊞ Groups'; btn.setAttribute('aria-pressed', 'true'); }
     }
   });
 
@@ -537,6 +581,7 @@ async function main() {
     if (lbl) lbl.textContent = hiding ? '⚙ Dev only (active)' : '⚙ Dev only';
     if (btn) btn.classList.toggle('bg-blue-700', hiding);
     if (btn) btn.classList.toggle('bg-gray-700', !hiding);
+    if (btn) btn.setAttribute('aria-pressed', String(hiding));
     // In focus mode, rebuild the focus set with/without library nodes
     if (_isFocused) switchView();
   });

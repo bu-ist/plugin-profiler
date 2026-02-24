@@ -32,52 +32,62 @@
 export const NODE_TYPES = {
 
   // ── PHP structure — blue ──────────────────────────────────────────────────
-  class:            { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-500' },
-  interface:        { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-400' },
+  // bg-blue-700 = 6.5:1 ✅  bg-blue-600 = 5.1:1 ✅  bg-blue-300 + text-gray-800 = 8.2:1 ✅
+  class:            { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-700' },
+  interface:        { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-600' },
   trait:            { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-300 text-gray-800' },
 
   // ── PHP behaviour — teal ──────────────────────────────────────────────────
-  function:         { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-500' },
-  method:           { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-400' },
+  // bg-teal-700 = 5.6:1 ✅  bg-teal-800 = 7.5:1 ✅
+  function:         { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-700' },
+  method:           { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-800' },
 
   // ── WordPress hooks — orange ──────────────────────────────────────────────
-  hook:             { color: '#F97316', shape: 'diamond',         badge: 'bg-orange-500' },
-  js_hook:          { color: '#F97316', shape: 'diamond',         badge: 'bg-orange-400' },
+  // bg-orange-700 = 5.1:1 ✅  bg-orange-800 = 7.2:1 ✅
+  hook:             { color: '#F97316', shape: 'diamond',         badge: 'bg-orange-700' },
+  js_hook:          { color: '#F97316', shape: 'diamond',         badge: 'bg-orange-800' },
 
   // ── WordPress integration points — green ──────────────────────────────────
-  rest_endpoint:    { color: '#22C55E', shape: 'hexagon',         badge: 'bg-green-500' },
-  ajax_handler:     { color: '#22C55E', shape: 'hexagon',         badge: 'bg-green-400' },
+  // bg-green-700 = 5.1:1 ✅  bg-green-800 = 7.3:1 ✅  bg-green-300 + text-gray-800 = 10.6:1 ✅
+  rest_endpoint:    { color: '#22C55E', shape: 'hexagon',         badge: 'bg-green-700' },
+  ajax_handler:     { color: '#22C55E', shape: 'hexagon',         badge: 'bg-green-800' },
   shortcode:        { color: '#22C55E', shape: 'tag',             badge: 'bg-green-300 text-gray-800' },
-  admin_page:       { color: '#22C55E', shape: 'rectangle',       badge: 'bg-green-600' },
-  cron_job:         { color: '#22C55E', shape: 'ellipse',         badge: 'bg-green-700' },
+  admin_page:       { color: '#22C55E', shape: 'rectangle',       badge: 'bg-green-700' },
+  cron_job:         { color: '#22C55E', shape: 'ellipse',         badge: 'bg-green-800' },
   post_type:        { color: '#22C55E', shape: 'barrel',          badge: 'bg-green-800' },
   taxonomy:         { color: '#22C55E', shape: 'barrel',          badge: 'bg-green-800' },
-  js_api_call:      { color: '#22C55E', shape: 'ellipse',         badge: 'bg-green-500' },
+  js_api_call:      { color: '#22C55E', shape: 'ellipse',         badge: 'bg-green-700' },
 
   // ── Data layer — purple ───────────────────────────────────────────────────
-  data_source:      { color: '#A855F7', shape: 'barrel',          badge: 'bg-purple-500' },
+  // bg-purple-700 = 8.3:1 ✅
+  data_source:      { color: '#A855F7', shape: 'barrel',          badge: 'bg-purple-700' },
 
   // ── Outbound HTTP — red ───────────────────────────────────────────────────
-  http_call:        { color: '#EF4444', shape: 'ellipse',         badge: 'bg-red-500' },
+  // bg-red-700 = 6.0:1 ✅
+  http_call:        { color: '#EF4444', shape: 'ellipse',         badge: 'bg-red-700' },
 
   // ── File system — gray ────────────────────────────────────────────────────
-  file:             { color: '#6B7280', shape: 'rectangle',       badge: 'bg-gray-500' },
+  // bg-gray-600 = 7.3:1 ✅
+  file:             { color: '#6B7280', shape: 'rectangle',       badge: 'bg-gray-600' },
 
   // ── Gutenberg — pink ──────────────────────────────────────────────────────
-  gutenberg_block:  { color: '#EC4899', shape: 'round-rectangle', badge: 'bg-pink-500' },
+  // bg-pink-700 = 6.1:1 ✅
+  gutenberg_block:  { color: '#EC4899', shape: 'round-rectangle', badge: 'bg-pink-700' },
 
   // ── JS equivalents — same families as PHP for visual continuity ───────────
-  js_function:      { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-500' },
-  js_class:         { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-500' },
+  js_function:      { color: '#14B8A6', shape: 'roundrectangle',  badge: 'bg-teal-700' },
+  js_class:         { color: '#3B82F6', shape: 'round-rectangle', badge: 'bg-blue-700' },
 
   // ── React / modern frontend — distinct cyan / violet / rose ───────────────
-  react_component:  { color: '#06B6D4', shape: 'round-rectangle', badge: 'bg-cyan-500' },
-  react_hook:       { color: '#8B5CF6', shape: 'diamond',         badge: 'bg-violet-500' },
-  fetch_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-500' },
-  axios_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-500' },
+  // bg-cyan-700 = 5.4:1 ✅  bg-violet-700 = 9.1:1 ✅  bg-rose-700 = 6.3:1 ✅
+  react_component:  { color: '#06B6D4', shape: 'round-rectangle', badge: 'bg-cyan-700' },
+  react_hook:       { color: '#8B5CF6', shape: 'diamond',         badge: 'bg-violet-700' },
+  fetch_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-700' },
+  axios_call:       { color: '#F43F5E', shape: 'ellipse',         badge: 'bg-rose-700' },
 
   // ── WordPress data stores — amber ──────────────────────────────────────────
-  wp_store:         { color: '#F59E0B', shape: 'barrel',          badge: 'bg-amber-500' },
+  // bg-amber-700 = 4.9:1 ✅
+  wp_store:         { color: '#F59E0B', shape: 'barrel',          badge: 'bg-amber-700' },
 
   // ── Compound group nodes — neutral slate (recede behind their children) ───
   namespace:        { color: '#1E293B', shape: 'round-rectangle', badge: 'bg-slate-600' },
