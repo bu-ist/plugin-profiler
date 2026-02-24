@@ -234,6 +234,13 @@ function buildStylesheet() {
       selector: 'edge.view-hidden',
       style: { 'display': 'none' },
     },
+    // ── View-mode ghost dim — nodes with no visible edges in filtered modes ─
+    // Distinct from hover `.dimmed` (0.15) — ghost dim is intentional, not transient.
+    // Labels are hidden (text-opacity:0) so the ghosted node doesn't add text noise.
+    {
+      selector: 'node.view-dimmed',
+      style: { 'opacity': 0.12, 'text-opacity': 0 },
+    },
     // ── Selection / highlight ring ────────────────────────────────────────
     {
       selector: 'node:selected',

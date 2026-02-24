@@ -241,14 +241,19 @@ function switchView() {
   if (layoutSelect && _isFocused) layoutSelect.value = autoLayout;
 
   applyLayout(_cy, _isFocused ? autoLayout : layoutName);
+
+  // Re-apply view mode filter (switchView rebuilds elements without classes)
+  applyViewMode();
+  updateViewModeCounts();
 }
 
 // ── applyViewMode ─────────────────────────────────────────────────────────────
 
 /**
  * Show/hide edges in the rendered graph based on the current _viewMode.
- * Nodes are never hidden — only edges are filtered so the graph topology remains
- * clear even when only one edge category is selected.
+ * When a filtered mode is active, nodes with no visible edges are ghost-dimmed
+ * (opacity 0.12, labels hidden) so the graph topology stays readable without
+ * unrelated nodes creating visual noise. Compound nodes are never dimmed.
  */
 function applyViewMode() {
   if (!_cy) return;
@@ -257,6 +262,7 @@ function applyViewMode() {
     if (!mode || !mode.edges) {
       // "all" — restore everything
       _cy.edges().removeClass('view-hidden');
+      _cy.nodes().removeClass('view-dimmed');
     } else {
       _cy.edges().forEach((edge) => {
         const type = edge.data('type') || '';
@@ -266,7 +272,37 @@ function applyViewMode() {
           edge.addClass('view-hidden');
         }
       });
+      // Ghost-dim nodes that have no visible edges in this mode.
+      // Compound group nodes (namespace/dir) are excluded — they shouldn't
+      // fade out just because their children lack edges in a given mode.
+      _cy.nodes().forEach((node) => {
+        const type = node.data('type') || '';
+        if (type === 'namespace' || type === 'dir') {
+          node.removeClass('view-dimmed');
+          return;
+        }
+        const hasVisible = node.connectedEdges().some(e => !e.hasClass('view-hidden'));
+        node.toggleClass('view-dimmed', !hasVisible);
+      });
     }
+  });
+}
+
+/**
+ * Update Requirements / Data flow button labels with the count of edges
+ * of that type present in the currently-rendered graph.
+ * Called after graph init and after switchView() changes the element set.
+ */
+function updateViewModeCounts() {
+  if (!_cy) return;
+  document.querySelectorAll('.view-mode-btn[data-view]').forEach((btn) => {
+    const view = btn.dataset.view;
+    if (view === 'all') return;
+    const modeDef = EDGE_VIEW_MODES[view];
+    if (!modeDef?.edges) return;
+    const count = _cy.edges().filter(e => modeDef.edges.has(e.data('type') || '')).length;
+    const base  = view === 'requirements' ? 'Requirements' : 'Data flow';
+    btn.textContent = `${base} (${count})`;
   });
 }
 
@@ -508,10 +544,13 @@ async function main() {
   updateFocusButton(focused.focusCount, focused.totalCount);
   showStatusBanner(focused.focusCount, focused.totalCount, true);
 
+  // Populate Requirements / Data flow counts now that _cy is ready
+  updateViewModeCounts();
+
   // Show the Dev-only filter button only when the graph contains library nodes
-  const hasLibraryNodes = (graphData.nodes || []).some(n => n.data?.is_library === true);
+  const allLibraryNodes = (graphData.nodes || []).filter(n => n.data?.is_library === true);
   const libBtn = document.getElementById('lib-filter-btn');
-  if (libBtn && hasLibraryNodes) libBtn.classList.remove('hidden');
+  if (libBtn && allLibraryNodes.length) libBtn.classList.remove('hidden');
 
   // Focus/Show-all toggle button
   document.getElementById('focus-btn')?.addEventListener('click', () => {
@@ -578,7 +617,14 @@ async function main() {
     const hiding = toggleLibraryFilter();
     const btn = document.getElementById('lib-filter-btn');
     const lbl = document.getElementById('lib-filter-label');
-    if (lbl) lbl.textContent = hiding ? '⚙ Dev only (active)' : '⚙ Dev only';
+    if (lbl) {
+      if (hiding) {
+        const libCount = allLibraryNodes.length;
+        lbl.textContent = `⚙ Dev only (${libCount} hidden)`;
+      } else {
+        lbl.textContent = '⚙ Dev only';
+      }
+    }
     if (btn) btn.classList.toggle('bg-blue-700', hiding);
     if (btn) btn.classList.toggle('bg-gray-700', !hiding);
     if (btn) btn.setAttribute('aria-pressed', String(hiding));
