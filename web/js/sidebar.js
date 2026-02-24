@@ -165,7 +165,7 @@ function buildSidebarHtml(data) {
            </div>
            <p class="text-sm leading-relaxed text-slate-200">${escapeHtml(data.description)}</p>
          </div>`
-      : '<p class="text-xs text-gray-500 italic mb-3">No AI description — run without <code class="text-gray-400">--no-descriptions</code> to generate.</p>'}
+      : '<p class="text-xs text-gray-500 italic mb-3">No AI description — add <code class="text-gray-400">--descriptions</code> to generate.</p>'}
 
     <div class="text-xs text-gray-400 mb-3">
       <span class="text-gray-500">File:</span>

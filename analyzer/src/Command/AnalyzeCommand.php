@@ -48,7 +48,7 @@ class AnalyzeCommand extends Command
             ->addOption('llm', null, InputOption::VALUE_REQUIRED, 'LLM provider: claude, ollama, openai, gemini')
             ->addOption('model', null, InputOption::VALUE_REQUIRED, 'LLM model name')
             ->addOption('api-key', null, InputOption::VALUE_REQUIRED, 'API key for external LLM provider')
-            ->addOption('no-descriptions', null, InputOption::VALUE_NONE, 'Skip LLM description generation')
+            ->addOption('descriptions', null, InputOption::VALUE_NONE, 'Enable LLM description generation')
             ->addOption('json-only', null, InputOption::VALUE_NONE, 'Output JSON only, do not start web server')
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Output directory', '/output');
     }
@@ -164,8 +164,8 @@ class AnalyzeCommand extends Command
         $graph->cycles = (new CyclicDependencyDetector())->detect($graph);
 
         // Step 5: LLM descriptions (if requested)
-        $noDescriptions = $input->getOption('no-descriptions');
-        if (!$noDescriptions) {
+        $descriptions = $input->getOption('descriptions');
+        if ($descriptions) {
             $llmProvider = (string) ($input->getOption('llm') ?? getenv('LLM_PROVIDER') ?: 'ollama');
             $llmModel    = (string) ($input->getOption('model') ?? getenv('LLM_MODEL') ?: 'qwen2.5-coder:7b');
             $apiKey      = (string) ($input->getOption('api-key') ?? getenv('LLM_API_KEY') ?: '');
@@ -180,7 +180,7 @@ class AnalyzeCommand extends Command
                 if (!$this->checkOllamaConnectivity($ollamaHost)) {
                     $output->writeln(sprintf('<error>Ollama is not reachable at %s.</error>', $ollamaHost));
                     $output->writeln('<comment>  → Start it: docker compose --profile llm up -d ollama</comment>');
-                    $output->writeln('<comment>  → Or skip descriptions: add --no-descriptions</comment>');
+                    $output->writeln('<comment>  → Or remove --descriptions to skip.</comment>');
                 } else {
                     $client = new OllamaClient($ollamaHost, $llmModel, $timeout);
                 }
@@ -215,12 +215,12 @@ class AnalyzeCommand extends Command
         }
 
         // Step 5b: Populate descriptions from docblocks for nodes without LLM descriptions.
-        // Runs regardless of --no-descriptions so entities with PHPDoc comments
+        // Runs regardless of --descriptions so entities with PHPDoc comments
         // always get at least a minimal description in the graph output.
         (new DocblockDescriptionExtractor())->extract($graph);
 
         // Step 5c: Synthesize descriptions from node metadata for any remaining
-        // nodes without descriptions. This ensures --no-descriptions still produces
+        // nodes without descriptions. This ensures runs without --descriptions still produce
         // informative context from structural metadata (params, return types, hooks, etc.).
         (new MetadataDescriptionSynthesizer())->synthesize($graph);
 

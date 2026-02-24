@@ -5,7 +5,7 @@
  *
  * Endpoints:
  *   GET  /status   → { running: bool, analyzedAt: string|null }
- *   POST /analyze  { path: string, noDescriptions?: bool }
+ *   POST /analyze  { path: string, descriptions?: bool }
  *                  → 202 { status: 'started' }
  *                     409 { error: 'Analysis already running' }
  *                     400 { error: 'path must be an absolute path' }
@@ -81,7 +81,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const { path, noDescriptions = true } = body;
+    const { path, descriptions = false } = body;
     if (!path || !path.startsWith('/')) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: 'path must be an absolute path (starts with /)' }));
@@ -92,7 +92,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(202);
     res.end(JSON.stringify({ status: 'started' }));
 
-    const flags = noDescriptions ? '--no-descriptions' : '';
+    const flags = descriptions ? '--descriptions' : '';
     // Use PLUGIN_PATH env var so docker-compose.yml mounts the new path as /plugin
     const cmd = `docker compose run --rm -e PLUGIN_PATH=${JSON.stringify(path)} analyzer /plugin ${flags}`;
     exec(cmd, { cwd: PROJECT_DIR, env: { ...process.env, PLUGIN_PATH: path } }, async (err) => {

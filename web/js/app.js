@@ -883,12 +883,34 @@ async function main() {
     });
   }
 
-  // Legend toggle button
-  document.getElementById('legend-btn')?.addEventListener('click', () => {
-    const panel = document.getElementById('legend-panel');
-    const btn   = document.getElementById('legend-btn');
-    const open  = panel?.classList.toggle('hidden') === false;
-    btn?.setAttribute('aria-expanded', String(open));
+  // Legend toggle button + close on click-outside / Escape
+  const legendPanel = document.getElementById('legend-panel');
+  const legendBtn   = document.getElementById('legend-btn');
+
+  function closeLegend() {
+    legendPanel?.classList.add('hidden');
+    legendBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  legendBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = legendPanel?.classList.toggle('hidden') === false;
+    legendBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  // Click anywhere outside legend panel → close it
+  document.addEventListener('click', (e) => {
+    if (legendPanel && !legendPanel.classList.contains('hidden')
+        && !legendPanel.contains(e.target) && !legendBtn.contains(e.target)) {
+      closeLegend();
+    }
+  });
+
+  // Escape key → close legend
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && legendPanel && !legendPanel.classList.contains('hidden')) {
+      closeLegend();
+    }
   });
 
   // Show the Dev-only filter button only when the graph contains library nodes

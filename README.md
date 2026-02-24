@@ -8,7 +8,7 @@ Plugin Profiler is a Dockerized static analysis tool that scans a PHP codebase, 
 
 ## Screenshots
 
-> _Analyzing Plugin Profiler's own codebase (653 nodes, 601 edges). Run takes ~4 seconds with `--no-descriptions`._
+> _Analyzing Plugin Profiler's own codebase (653 nodes, 601 edges). Run takes ~4 seconds without AI descriptions._
 
 | Graph overview — fCoSE force-directed layout | Node detail — sidebar inspector |
 |---|---|
@@ -43,7 +43,7 @@ After parsing, several analysis passes run automatically:
 - **Cross-reference resolution** — Connects JS `apiFetch()` calls to their PHP REST endpoints, AJAX fetches to PHP handlers, and Gutenberg block JS registrations to PHP block definitions
 - **Security annotation** — Scans function/method bodies for `current_user_can()`, `wp_verify_nonce()`, `check_ajax_referer()`, and sanitization calls; propagates findings to connected endpoints
 - **Circular dependency detection** — DFS-based cycle detection on structural edges (inheritance, calls, includes, instantiation); reports all unique cycles in the graph
-- **Metadata description synthesis** — When `--no-descriptions` is used, generates human-readable descriptions from node metadata (namespace, params, return type, hook priority, route pattern, etc.)
+- **Metadata description synthesis** — Generates human-readable descriptions from node metadata (namespace, params, return type, hook priority, route pattern, etc.) so every node has context even without AI
 
 ---
 
@@ -68,8 +68,8 @@ cd plugin-profiler
 # Make the CLI script executable (once)
 chmod +x bin/plugin-profiler
 
-# Analyze a plugin — skipping LLM descriptions for speed
-./bin/plugin-profiler analyze /path/to/your-wp-plugin --no-descriptions
+# Analyze a plugin (fast, no AI)
+./bin/plugin-profiler analyze /path/to/your-wp-plugin
 ```
 
 The command will:
@@ -94,14 +94,14 @@ sudo ln -s "$(pwd)/bin/plugin-profiler" /usr/local/bin/plugin-profiler
 Then from any directory:
 
 ```bash
-plugin-profiler analyze ~/Sites/woocommerce --no-descriptions
+plugin-profiler analyze ~/Sites/woocommerce
 ```
 
 ### Option B — Docker Compose directly
 
 ```bash
 PLUGIN_PATH=/absolute/path/to/plugin \
-  docker compose run --rm analyzer /plugin --no-descriptions
+  docker compose run --rm analyzer /plugin
 
 PLUGIN_PATH=/absolute/path/to/plugin \
   docker compose up -d web
@@ -124,7 +124,7 @@ Options:
   --llm <provider>     LLM provider: claude, ollama, openai, gemini  (default: ollama)
   --model <name>       LLM model identifier  (default: qwen2.5-coder:7b)
   --api-key <key>      API key for external LLM providers
-  --no-descriptions    Skip LLM description generation (much faster)
+  --descriptions       Enable AI description generation via LLM
   --json-only          Write graph-data.json only; do not start the web server
   --output <dir>       Output directory inside the container  (default: /output)
   --help               Show help
@@ -133,8 +133,8 @@ Options:
 ### Examples
 
 ```bash
-# Basic analysis, no descriptions
-plugin-profiler analyze ./my-plugin --no-descriptions
+# Basic analysis (default, no AI descriptions)
+plugin-profiler analyze ./my-plugin
 
 # Use Google Gemini for descriptions
 plugin-profiler analyze ./my-plugin \
@@ -160,19 +160,19 @@ plugin-profiler analyze ./my-plugin \
   --model qwen2.5-coder:7b
 
 # Analyze a WordPress theme
-plugin-profiler analyze ~/Sites/flavor-developer --no-descriptions
+plugin-profiler analyze ~/Sites/flavor-developer
 
 # Output JSON only, then serve manually
-plugin-profiler analyze ./my-plugin --no-descriptions --json-only
+plugin-profiler analyze ./my-plugin --json-only
 ```
 
 ---
 
 ## LLM description generation
 
-Plugin Profiler can generate a 2–3 sentence description for every developer-authored node in the graph using an LLM. This is optional — pass `--no-descriptions` to skip it.
+Plugin Profiler can generate a 2–3 sentence description for every developer-authored node in the graph using an LLM. This is optional — pass `--descriptions` to enable it.
 
-Even without an LLM, every node gets a useful description. The tool extracts PHPDoc blocks automatically and synthesizes descriptions from structural metadata (namespace, parameters, return type, hook priority, route pattern, capability requirements, etc.) — so `--no-descriptions` still produces an informative graph.
+Even without an LLM, every node gets a useful description. The tool extracts PHPDoc blocks automatically and synthesizes descriptions from structural metadata (namespace, parameters, return type, hook priority, route pattern, capability requirements, etc.) — so the default no-AI mode still produces an informative graph.
 
 Descriptions are only generated for nodes the developer actually wrote. Bundled libraries (detected from directory names like `lib/`, `third-party/`, `bower_components/`, etc.) are automatically skipped.
 
@@ -188,7 +188,7 @@ Descriptions are only generated for nodes the developer actually wrote. Bundled 
 
 Claude Haiku is the recommended cloud provider for most plugins — fast and inexpensive. Use Sonnet for the highest-quality descriptions on critical audits.
 
-> **Note on analysis time:** Parsing is the main bottleneck for large plugins, not the LLM. A plugin with 1,000+ JS files can take 5–8 minutes to parse before descriptions even begin. Use `--no-descriptions` for quick iteration.
+> **Note on analysis time:** Parsing is the main bottleneck for large plugins, not the LLM. A plugin with 1,000+ JS files can take 5–8 minutes to parse before descriptions even begin. Omit `--descriptions` for quick iteration.
 
 ### Ollama (local, default)
 
@@ -507,7 +507,7 @@ Host machine
 6. **SecurityAnnotator** — Scans function bodies for capability checks, nonce verification, and sanitization patterns; propagates to connected endpoints.
 7. **CyclicDependencyDetector** — DFS cycle detection on structural edges with deduplication via canonical rotation.
 8. **DocblockDescriptionExtractor** — Extracts PHPDoc `@summary` / first-line descriptions for nodes without LLM descriptions.
-9. **MetadataDescriptionSynthesizer** — Generates human-readable descriptions from node metadata for any remaining nodes without descriptions (ensures `--no-descriptions` still produces useful context).
+9. **MetadataDescriptionSynthesizer** — Generates human-readable descriptions from node metadata for any remaining nodes without descriptions (ensures runs without `--descriptions` still produce useful context).
 10. **DescriptionGenerator** (optional) — Batches entities to the configured LLM provider, attaches AI descriptions. Also generates a plugin-level architectural summary.
 11. **JsonExporter** — Writes Cytoscape.js-compatible `graph-data.json` with compound nodes, edge metadata, and cycle data.
 
@@ -694,7 +694,7 @@ The analyzer writes `graph-data.json` to the shared Docker volume, served at `/d
 Plugin Profiler also works with WordPress themes. If no `Plugin Name:` header is found, the analyzer falls back to reading `style.css` for a `Theme Name:` header. All PHP, JS, and block.json analysis works identically.
 
 ```bash
-plugin-profiler analyze ~/Sites/flavor-developer --no-descriptions
+plugin-profiler analyze ~/Sites/flavor-developer
 ```
 
 ---
@@ -728,20 +728,20 @@ plugin-profiler analyze ./plugin --llm ollama --model qwen2.5-coder:3b
 
 Run the analyzer before opening the browser:
 ```bash
-plugin-profiler analyze ./my-plugin --no-descriptions
+plugin-profiler analyze ./my-plugin
 ```
 
 ### Port 9000 already in use
 
 ```bash
-plugin-profiler analyze ./my-plugin --no-descriptions --port 8080
+plugin-profiler analyze ./my-plugin --port 8080
 ```
 
 ### Out of memory on very large plugins
 
 Plugins with 15,000+ entities (e.g. Jetpack) require extra memory. The Dockerfile sets `memory_limit=512M` by default. If you see out-of-memory errors, increase it:
 ```bash
-docker compose run --rm -e PHP_MEMORY_LIMIT=1024M analyzer /plugin --no-descriptions
+docker compose run --rm -e PHP_MEMORY_LIMIT=1024M analyzer /plugin
 ```
 
 ### Too many nodes — graph is slow

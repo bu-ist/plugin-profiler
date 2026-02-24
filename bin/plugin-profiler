@@ -53,21 +53,21 @@ ${BOLD}Options:${NC}
   --llm <provider>     Enable AI descriptions: claude, ollama, openai, gemini
   --model <name>       LLM model name (default: qwen2.5-coder:7b for ollama)
   --api-key <key>      API key for claude / openai / gemini
-  --no-descriptions    Skip AI descriptions (faster, offline)
+  --descriptions       Enable AI descriptions (requires --llm or LLM_API_KEY)
   --json-only          Write JSON only, skip web UI
   --output <dir>       Output directory inside container (default: /output)
   --help               Show this help
 
-${BOLD}Quick start (no AI):${NC}
-  plugin-profiler analyze ./my-plugin --no-descriptions
+${BOLD}Quick start:${NC}
+  plugin-profiler analyze ./my-plugin
 
 ${BOLD}With AI descriptions (local, free — downloads ~4 GB model first time):${NC}
-  plugin-profiler analyze ./my-plugin --llm ollama
+  plugin-profiler analyze ./my-plugin --descriptions --llm ollama
 
 ${BOLD}With AI descriptions (cloud, instant):${NC}
-  plugin-profiler analyze ./my-plugin --llm claude  --api-key sk-ant-...
-  plugin-profiler analyze ./my-plugin --llm openai  --api-key sk-...
-  plugin-profiler analyze ./my-plugin --llm gemini  --api-key YOUR_KEY
+  plugin-profiler analyze ./my-plugin --descriptions --llm claude  --api-key sk-ant-...
+  plugin-profiler analyze ./my-plugin --descriptions --llm openai  --api-key sk-...
+  plugin-profiler analyze ./my-plugin --descriptions --llm gemini  --api-key YOUR_KEY
 
 EOF
 }
@@ -106,7 +106,7 @@ PORT=9000
 LLM_PROVIDER=""
 LLM_MODEL=""
 API_KEY=""
-NO_DESCRIPTIONS=false
+DESCRIPTIONS=false
 JSON_ONLY=false
 OUTPUT_DIR="/output"
 
@@ -117,7 +117,7 @@ while [[ $# -gt 0 ]]; do
         --llm)             LLM_PROVIDER="$2"; shift 2 ;;
         --model)           LLM_MODEL="$2";    shift 2 ;;
         --api-key)         API_KEY="$2";      shift 2 ;;
-        --no-descriptions) NO_DESCRIPTIONS=true; shift ;;
+        --descriptions) DESCRIPTIONS=true; shift ;;
         --json-only)       JSON_ONLY=true;    shift ;;
         --output)          OUTPUT_DIR="$2";   shift 2 ;;
         --help|-h)         usage; exit 0 ;;
@@ -126,13 +126,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Resolve LLM defaults
-if [[ -z "$LLM_PROVIDER" ]] && ! $NO_DESCRIPTIONS; then
-    # No --llm and no --no-descriptions: default to no descriptions for speed
-    # unless an API key is in environment
+if $DESCRIPTIONS && [[ -z "$LLM_PROVIDER" ]]; then
+    # --descriptions without --llm: use environment key or fall back to ollama
     if [[ -n "${LLM_API_KEY:-}" ]]; then
-        LLM_PROVIDER="${LLM_PROVIDER:-${LLM_PROVIDER:-ollama}}"
+        LLM_PROVIDER="ollama"
     else
-        NO_DESCRIPTIONS=true
+        LLM_PROVIDER="ollama"
     fi
 fi
 
@@ -155,10 +154,10 @@ export PORT
 heading "Plugin Profiler"
 step "Plugin:  $PLUGIN_PATH"
 step "Port:    $PORT"
-if $NO_DESCRIPTIONS; then
-    step "AI:      disabled (--no-descriptions)"
-else
+if $DESCRIPTIONS; then
     step "AI:      $LLM_PROVIDER / $LLM_MODEL"
+else
+    step "AI:      disabled (add --descriptions to enable)"
 fi
 echo ""
 
@@ -176,13 +175,13 @@ elif [[ -n "${LLM_API_KEY:-}" ]]; then
 fi
 
 ANALYZER_CMD=("/plugin")
-$NO_DESCRIPTIONS && ANALYZER_CMD+=("--no-descriptions")
+$DESCRIPTIONS && ANALYZER_CMD+=("--descriptions")
 $JSON_ONLY       && ANALYZER_CMD+=("--json-only")
 ANALYZER_CMD+=("--output" "$OUTPUT_DIR")
 
 # ── Determine LLM profile ───────────────────────────────────────────────────
 USE_LLM_PROFILE=false
-if ! $NO_DESCRIPTIONS && [[ "${LLM_PROVIDER:-}" == "ollama" ]]; then
+if $DESCRIPTIONS && [[ "${LLM_PROVIDER:-}" == "ollama" ]]; then
     USE_LLM_PROFILE=true
 fi
 
