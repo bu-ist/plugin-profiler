@@ -156,38 +156,90 @@ function updateFocusButton(focusCount, totalCount) {
     : `⊛ All nodes (${totalCount})`;
 }
 
+// Banner state: 'hidden' | 'expanded' | 'minimized'
+let _bannerState = 'hidden';
+
 /**
- * Show, update, or hide the pre-existing status banner in the HTML.
- * The banner element lives in index.html (not dynamically created) so it
- * exists in the DOM before Cytoscape initialises — no stacking-context battle.
- * JS only toggles visibility and updates the text.
+ * Show, update, or hide the pre-existing status banner.
+ * Uses style.display (NOT the hidden attribute) because Tailwind's `flex`
+ * class overrides the HTML hidden attribute.
  *
- * @param {number}  focusCount - Nodes currently rendered.
- * @param {number}  totalCount - Total available leaf nodes.
- * @param {boolean} isFocused  - Whether focus mode is active.
+ * In focus mode the banner shows; in show-all mode it updates text to reflect
+ * the full count. The banner is always visible (expanded or minimized) as long
+ * as there are more nodes available than currently rendered.
  */
 function showStatusBanner(focusCount, totalCount, isFocused) {
   const banner = document.getElementById('status-banner');
   if (!banner) return;
 
-  // Hide when every node is already visible
-  if (!isFocused || focusCount >= totalCount) {
-    banner.hidden = true;
+  // Hide completely only when focus set === full set (small plugin)
+  if (focusCount >= totalCount && !isFocused) {
+    banner.style.display = 'none';
+    _bannerState = 'hidden';
     return;
   }
 
-  // Update the text content
+  // Update text for both expanded and minimized views
   const textEl = document.getElementById('status-banner-text');
-  if (textEl) {
-    textEl.innerHTML = `⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.`;
+  const miniEl = document.getElementById('status-banner-mini-text');
+  const showAllBtn = document.getElementById('status-banner-show-all');
+
+  if (isFocused) {
+    if (textEl) textEl.innerHTML = `⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes`;
+    if (miniEl) miniEl.textContent = `${focusCount} / ${totalCount}`;
+    if (showAllBtn) { showAllBtn.textContent = 'Show all →'; showAllBtn.style.display = ''; }
+  } else {
+    if (textEl) textEl.innerHTML = `⊛ Showing all <strong class="text-white">${totalCount}</strong> nodes`;
+    if (miniEl) miniEl.textContent = `${totalCount}`;
+    if (showAllBtn) { showAllBtn.textContent = 'Focus ←'; showAllBtn.style.display = ''; }
   }
 
-  // Reset position to centered-bottom whenever the banner is reshown
-  banner.style.bottom = '2.5rem';
-  banner.style.left   = '50%';
-  banner.style.top    = 'auto';
+  // Show the banner if it was hidden — preserve minimized state if already set
+  if (_bannerState === 'hidden') {
+    setBannerExpanded(banner);
+  } else {
+    // Already visible — just make sure display is on
+    banner.style.display = 'flex';
+  }
+}
+
+/** Switch the banner to expanded (full) mode. */
+function setBannerExpanded(banner) {
+  if (!banner) banner = document.getElementById('status-banner');
+  if (!banner) return;
+  _bannerState = 'expanded';
+  banner.style.display = 'flex';
+  // Show expanded elements, hide minimized pill
+  const drag     = document.getElementById('status-banner-drag');
+  const showAll  = document.getElementById('status-banner-show-all');
+  const minimize = document.getElementById('status-banner-minimize');
+  const expand   = document.getElementById('status-banner-expand');
+  if (drag)     drag.style.display     = '';
+  if (showAll)  showAll.style.display   = '';
+  if (minimize) minimize.style.display  = '';
+  if (expand)   expand.style.display    = 'none';
+}
+
+/** Switch the banner to minimized (small pill) mode. */
+function setBannerMinimized(banner) {
+  if (!banner) banner = document.getElementById('status-banner');
+  if (!banner) return;
+  _bannerState = 'minimized';
+  banner.style.display = 'flex';
+  // Hide expanded elements, show minimized pill
+  const drag     = document.getElementById('status-banner-drag');
+  const showAll  = document.getElementById('status-banner-show-all');
+  const minimize = document.getElementById('status-banner-minimize');
+  const expand   = document.getElementById('status-banner-expand');
+  if (drag)     drag.style.display     = 'none';
+  if (showAll)  showAll.style.display   = 'none';
+  if (minimize) minimize.style.display  = 'none';
+  if (expand)   expand.style.display    = '';
+  // Reset position to bottom-center when minimizing
+  banner.style.bottom    = '2.5rem';
+  banner.style.left      = '50%';
+  banner.style.top       = 'auto';
   banner.style.transform = 'translateX(-50%)';
-  banner.hidden = false;
 }
 
 /**
@@ -195,24 +247,33 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
  * Called once from main() after the DOM is ready.
  */
 function initStatusBanner() {
-  const banner    = document.getElementById('status-banner');
+  const banner     = document.getElementById('status-banner');
   const dragHandle = document.getElementById('status-banner-drag');
   const showAllBtn = document.getElementById('status-banner-show-all');
-  const dismissBtn = document.getElementById('status-banner-dismiss');
+  const minimizeBtn = document.getElementById('status-banner-minimize');
+  const expandBtn  = document.getElementById('status-banner-expand');
   if (!banner || !dragHandle) return;
 
   // ── Button actions ──────────────────────────────────────────────────────
   showAllBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     e.preventDefault();
-    _isFocused = false;
+    // Toggle between focus and show-all
+    _isFocused = !_isFocused;
+    document.getElementById('focus-btn')?.setAttribute('aria-pressed', String(_isFocused));
     switchView();
   });
 
-  dismissBtn?.addEventListener('click', (e) => {
+  minimizeBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     e.preventDefault();
-    banner.hidden = true;
+    setBannerMinimized(banner);
+  });
+
+  expandBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setBannerExpanded(banner);
   });
 
   // ── Drag-to-reposition ──────────────────────────────────────────────────
@@ -221,12 +282,11 @@ function initStatusBanner() {
   let dragOffsetY = 0;
 
   dragHandle.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;          // left button only
+    if (e.button !== 0) return;
     isDragging = true;
     const rect = banner.getBoundingClientRect();
     dragOffsetX = e.clientX - rect.left;
     dragOffsetY = e.clientY - rect.top;
-    // Switch from centered-bottom to absolute top/left
     banner.style.bottom    = 'auto';
     banner.style.left      = rect.left + 'px';
     banner.style.top       = rect.top  + 'px';
