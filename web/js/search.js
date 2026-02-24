@@ -1,23 +1,34 @@
 /**
  * Search and type-filter controls for the Plugin Profiler graph.
  *
- * Public entry point: initSearch(cy, allNodes).
+ * Public entry point: initSearch(cy, allNodes, { onExpandRequest, onRestoreFocus }).
  * Wires the text search input, builds type-filter toggle buttons from the
  * live node set, and binds keyboard shortcuts (/, F, Esc, 1–9).
+ *
+ * Search queries the FULL node list (_allNodes) — not just the rendered
+ * Cytoscape subset.  When matches exist only outside the focus set, the
+ * graph auto-expands to show-all via the onExpandRequest callback.  When
+ * the query is cleared, focus mode is restored via onRestoreFocus.
  */
 
 import { nodeBadge } from './constants.js';
 
 let _cy = null;
 let _activeTypes = new Set();
-let _allNodes = null;  // full node list (may exceed rendered set)
+let _allNodes = null;           // full node list (may exceed rendered set)
 let _hideLibrary = false;
-let _fitTimer = null;       // debounce timer for search-triggered fit
-let _savedViewport = null;  // viewport before search began
+let _fitTimer = null;           // debounce timer for search-triggered fit
+let _savedViewport = null;      // viewport before search began
+let _expandedBySearch = false;  // true when search triggered show-all
+let _expandTimer = null;        // debounce timer for auto-expansion
+let _onExpandRequest = null;    // callback: switch to show-all
+let _onRestoreFocus = null;     // callback: switch back to focus
 
-export function initSearch(cy, allNodes = null) {
+export function initSearch(cy, allNodes = null, { onExpandRequest, onRestoreFocus } = {}) {
   _cy = cy;
   _allNodes = allNodes;
+  _onExpandRequest = onExpandRequest || null;
+  _onRestoreFocus = onRestoreFocus || null;
 
   // Build type set from the FULL node list (not just the focus subset),
   // so all types get toggle buttons even if some are outside the initial view.
@@ -36,6 +47,16 @@ export function initSearch(cy, allNodes = null) {
   populateAutocomplete();
   bindSearchInput();
   bindKeyboardShortcuts();
+}
+
+/**
+ * Reset the search-triggered expansion flag.
+ * Call this when the user manually toggles focus/show-all so that
+ * clearing the search afterwards does not re-toggle the view.
+ */
+export function resetSearchExpansion() {
+  _expandedBySearch = false;
+  clearTimeout(_expandTimer);
 }
 
 /**
@@ -101,12 +122,50 @@ function toggleType(type, btn) {
   applyFilters();
 }
 
+// ── Core search + filter logic ───────────────────────────────────────────────
+
+/**
+ * Test whether a raw JSON node (from _allNodes) passes the current filters.
+ */
+function nodeMatchesQuery(n, query) {
+  const d     = n.data || n;
+  const type  = d.type || '';
+  const label = (d.label || d.id || '').toLowerCase();
+  const isLib = d.is_library || false;
+
+  const typeVisible    = _activeTypes.has(type);
+  const searchMatch    = !query || label.includes(query);
+  const libraryVisible = !_hideLibrary || !isLib;
+
+  return typeVisible && searchMatch && libraryVisible;
+}
+
+/**
+ * Count how many nodes in the FULL _allNodes list match the current query
+ * and active filters (type toggles + library filter).
+ */
+function countFullMatches(query) {
+  if (!query || !_allNodes) return 0;
+  let count = 0;
+  for (const n of _allNodes) {
+    if (nodeMatchesQuery(n, query)) count++;
+  }
+  return count;
+}
+
 export function applyFilters() {
   if (!_cy) return;
 
+  // Cancel any pending auto-expansion from a previous keystroke
+  clearTimeout(_expandTimer);
+
   const query = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
 
-  let visibleCount = 0;
+  // ── Count matches against FULL node list ────────────────────────────────
+  const fullMatchCount = countFullMatches(query);
+
+  // ── Filter rendered Cytoscape nodes ─────────────────────────────────────
+  let renderedMatchCount = 0;
   _cy.batch(() => {
     _cy.nodes().forEach((node) => {
       const type = node.data('type');
@@ -118,7 +177,7 @@ export function applyFilters() {
       if (typeVisible && searchMatch && libraryVisible) {
         node.style('display', 'element');
         node.removeClass('dimmed');
-        if (query) visibleCount++;
+        if (query) renderedMatchCount++;
       } else {
         node.style('display', 'none');
       }
@@ -133,8 +192,23 @@ export function applyFilters() {
     });
   });
 
-  // Auto-fit to visible search results (debounced to avoid jarring per-keystroke fits)
-  if (query && visibleCount > 0) {
+  // ── Auto-expand: matches exist outside focus set ────────────────────────
+  // Debounce the expansion to avoid jarring per-keystroke view switches.
+  if (query && fullMatchCount > 0 && renderedMatchCount === 0
+      && !_expandedBySearch && _onExpandRequest) {
+    _expandTimer = setTimeout(() => {
+      _expandedBySearch = true;
+      _onExpandRequest();
+      // Re-apply filters on the now-expanded Cytoscape element set
+      applyFilters();
+    }, 400);
+    // Show the total count immediately (yellow = "matches exist, expanding…")
+    updateMatchCount(query, 0, fullMatchCount);
+    return; // wait for the debounced expansion
+  }
+
+  // ── Auto-fit to visible search results (debounced) ──────────────────────
+  if (query && renderedMatchCount > 0) {
     if (!_savedViewport) {
       _savedViewport = { zoom: _cy.zoom(), pan: { ..._cy.pan() } };
     }
@@ -152,8 +226,14 @@ export function applyFilters() {
     _savedViewport = null;
   }
 
-  // Update match count indicator
-  updateMatchCount(query, visibleCount);
+  // ── Restore focus when search is cleared after auto-expansion ───────────
+  if (!query && _expandedBySearch) {
+    _expandedBySearch = false;
+    if (_onRestoreFocus) _onRestoreFocus();
+  }
+
+  // ── Update match count badge ────────────────────────────────────────────
+  updateMatchCount(query, renderedMatchCount, fullMatchCount);
 }
 
 function populateAutocomplete() {
@@ -177,7 +257,14 @@ function populateAutocomplete() {
   });
 }
 
-function updateMatchCount(query, count) {
+/**
+ * Update the match-count badge inside the search input wrapper.
+ *
+ * @param {string}  query          Current search query (empty = hide badge)
+ * @param {number}  renderedCount  Matches visible in the current Cytoscape set
+ * @param {number}  totalCount     Matches in the full _allNodes list
+ */
+function updateMatchCount(query, renderedCount, totalCount = 0) {
   let badge = document.getElementById('search-match-count');
   if (!badge) {
     const wrap = document.getElementById('search-input')?.parentElement;
@@ -187,8 +274,19 @@ function updateMatchCount(query, count) {
     wrap.appendChild(badge);
   }
   if (query) {
-    badge.textContent = `${count}`;
-    const color = count > 0 ? 'text-slate-400' : 'text-red-400';
+    // Show split count when there are more total matches than rendered
+    const showSplit = totalCount > renderedCount && renderedCount > 0;
+    badge.textContent = showSplit ? `${renderedCount}/${totalCount}` : `${renderedCount || totalCount}`;
+
+    // Color semantics: slate = matches visible, yellow = expanding, red = none
+    let color;
+    if (renderedCount > 0) {
+      color = 'text-slate-400';
+    } else if (totalCount > 0) {
+      color = 'text-yellow-400'; // matches exist outside focus, expansion pending
+    } else {
+      color = 'text-red-400';
+    }
     badge.className = `absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-mono pointer-events-none ${color}`;
     badge.style.display = '';
   } else {

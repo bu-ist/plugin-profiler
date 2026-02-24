@@ -1,7 +1,7 @@
 import { initCytoscape } from './graph.js';
 import { applyLayout, pickLayout } from './layouts.js';
 import { openSidebar, closeSidebar, initSidebar, openPluginSummary } from './sidebar.js';
-import { initSearch, toggleLibraryFilter, isLibraryFilterActive } from './search.js';
+import { initSearch, toggleLibraryFilter, isLibraryFilterActive, resetSearchExpansion } from './search.js';
 import { EDGE_VIEW_MODES, EDGE_TYPE_META } from './constants.js';
 import { escapeHtml } from './utils.js';
 
@@ -261,7 +261,9 @@ function initStatusBanner() {
   showAllBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     e.preventDefault();
-    // Toggle between focus and show-all
+    // Toggle between focus and show-all (manual toggle resets search expansion
+    // so clearing the search afterwards won't re-toggle the view).
+    resetSearchExpansion();
     _isFocused = !_isFocused;
     document.getElementById('focus-btn')?.setAttribute('aria-pressed', String(_isFocused));
     switchView();
@@ -799,9 +801,24 @@ async function main() {
     animationDuration: 0,
   });
 
-  // Search operates on ALL nodes (not just rendered), so pass full graphData
+  // Search operates on ALL nodes (not just rendered), so pass full graphData.
+  // When search matches exist only outside the focus set, auto-expand to show-all;
+  // when search is cleared after auto-expansion, restore focus mode.
   initSidebar(_cy);
-  initSearch(_cy, graphData.nodes || []);
+  initSearch(_cy, graphData.nodes || [], {
+    onExpandRequest: () => {
+      if (!_isFocused) return;          // already showing all
+      _isFocused = false;
+      document.getElementById('focus-btn')?.setAttribute('aria-pressed', 'false');
+      switchView();
+    },
+    onRestoreFocus: () => {
+      if (_isFocused) return;           // already in focus
+      _isFocused = true;
+      document.getElementById('focus-btn')?.setAttribute('aria-pressed', 'true');
+      switchView();
+    },
+  });
 
   // Show AI summary as the default sidebar state when available
   openPluginSummary(p);
@@ -918,8 +935,9 @@ async function main() {
   const libBtn = document.getElementById('lib-filter-btn');
   if (libBtn && allLibraryNodes.length) libBtn.classList.remove('hidden');
 
-  // Focus/Show-all toggle button
+  // Focus/Show-all toggle button (manual toggle resets search expansion)
   document.getElementById('focus-btn')?.addEventListener('click', () => {
+    resetSearchExpansion();
     _isFocused = !_isFocused;
     document.getElementById('focus-btn')?.setAttribute('aria-pressed', String(_isFocused));
     switchView();
