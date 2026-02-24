@@ -406,8 +406,27 @@ class FileScanner
     }
 
     /**
+     * Patterns that identify module-bundler output (Browserify, Rollup, Parcel).
+     *
+     * Browserify wraps everything in a distinctive IIFE whose first ~60 chars are:
+     *   (function(){function r(e,n,t){function o(i,f){if(!n[i]){
+     * The key fingerprint is the "Cannot find module" error string inside the IIFE,
+     * which is part of the Browserify runtime and never appears in hand-written code.
+     *
+     * Rollup's default IIFE wrapper starts with `(function (` or `!function(` followed
+     * by `'use strict';` and typical helper definitions.
+     */
+    private const BUNDLER_PATTERNS = [
+        'cannot find module',           // Browserify runtime error message
+        '__webpack_require__',          // Webpack runtime
+        'webpackchunkname',             // Webpack chunk comments
+        'parcelrequire',               // Parcel bundler runtime
+    ];
+
+    /**
      * Returns true if the file's first 512 bytes contain a known generator marker.
      * Catches TypeScript compiler output, CRA builds, jOOQ, protobuf stubs, etc.
+     * Also detects Browserify/webpack/Parcel bundle wrappers via BUNDLER_PATTERNS.
      */
     private function isGeneratedByMarker(string $fullPath): bool
     {
@@ -423,6 +442,13 @@ class FileScanner
         $lower = strtolower($header);
         foreach (self::GENERATED_MARKERS as $marker) {
             if (str_contains($lower, $marker)) {
+                return true;
+            }
+        }
+
+        // Check for module-bundler output signatures
+        foreach (self::BUNDLER_PATTERNS as $pattern) {
+            if (str_contains($lower, $pattern)) {
                 return true;
             }
         }

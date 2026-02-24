@@ -140,13 +140,88 @@ class FunctionVisitorTest extends TestCase
         $this->assertEmpty($instantiatesEdges, 'Anonymous class instantiation should produce no edge');
     }
 
-    public function testEnterNode_WithNewOutsideFunction_SkipsEdge(): void
+    public function testEnterNode_WithNewOutsideFunction_CreatesEdgeFromFileNode(): void
     {
         $this->parse('<?php $obj = new SomeClass();');
 
         $edges = $this->collection->getAllEdges();
         $instantiatesEdges = array_filter($edges, static fn ($e) => $e->type === 'instantiates');
 
-        $this->assertEmpty($instantiatesEdges, 'File-scope instantiation should produce no edge');
+        $this->assertCount(1, $instantiatesEdges, 'File-scope instantiation should produce edge from file node');
+
+        $edge = reset($instantiatesEdges);
+        $this->assertStringStartsWith('file_', $edge->source, 'Source should be file node');
+        $this->assertSame('class_SomeClass', $edge->target);
+    }
+
+    // ── Function call detection ──────────────────────────────────────────────
+
+    public function testEnterNode_WithFuncCall_InsideFunction_CreatesCallsEdge(): void
+    {
+        $this->parse('<?php function caller() { my_custom_func(); }');
+
+        $edges = $this->collection->getAllEdges();
+        $callsEdges = array_filter($edges, static fn ($e) => $e->type === 'calls' && $e->target === 'func_my_custom_func');
+
+        $this->assertCount(1, $callsEdges, 'Function call should produce a calls edge');
+
+        $edge = reset($callsEdges);
+        $this->assertSame('func_caller', $edge->source);
+    }
+
+    public function testEnterNode_WithFuncCall_AtFileScope_CreatesEdgeFromFileNode(): void
+    {
+        $this->parse('<?php my_custom_func();');
+
+        $edges = $this->collection->getAllEdges();
+        $callsEdges = array_filter($edges, static fn ($e) => $e->type === 'calls' && $e->target === 'func_my_custom_func');
+
+        $this->assertCount(1, $callsEdges, 'File-scope function call should produce a calls edge');
+
+        $edge = reset($callsEdges);
+        $this->assertStringStartsWith('file_', $edge->source, 'Source should be file node at file scope');
+    }
+
+    public function testEnterNode_WithCommonApiCall_SkipsEdge(): void
+    {
+        // Common WordPress/PHP functions should be skipped for performance
+        $this->parse('<?php function test() { esc_html($x); sprintf("%s", $y); }');
+
+        $edges = $this->collection->getAllEdges();
+        $callsEdges = array_filter($edges, static fn ($e) => $e->type === 'calls');
+
+        $this->assertEmpty($callsEdges, 'Common API functions should not produce calls edges');
+    }
+
+    public function testEnterNode_WithStaticCallAtFileScope_CreatesEdgeFromFileNode(): void
+    {
+        $this->parse('<?php MyHelper::init();');
+
+        $edges = $this->collection->getAllEdges();
+        $callsEdges = array_filter($edges, static fn ($e) => $e->type === 'calls');
+
+        $this->assertCount(1, $callsEdges, 'File-scope static call should produce a calls edge');
+
+        $edge = reset($callsEdges);
+        $this->assertStringStartsWith('file_', $edge->source, 'Source should be file node at file scope');
+        $this->assertSame('class_MyHelper', $edge->target);
+    }
+
+    public function testEnterNode_WithMultipleFuncCalls_CreatesMultipleEdges(): void
+    {
+        $code = '<?php
+            function orchestrator() {
+                helper_a();
+                helper_b();
+            }
+        ';
+        $this->parse($code);
+
+        $edges = $this->collection->getAllEdges();
+        $callsEdges = array_filter($edges, static fn ($e) => $e->type === 'calls');
+        $targets = array_map(static fn ($e) => $e->target, array_values($callsEdges));
+
+        $this->assertContains('func_helper_a', $targets);
+        $this->assertContains('func_helper_b', $targets);
     }
 }

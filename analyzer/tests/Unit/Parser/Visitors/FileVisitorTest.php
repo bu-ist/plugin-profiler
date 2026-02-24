@@ -122,4 +122,44 @@ class FileVisitorTest extends TestCase
         $fileNodes = array_filter($nodes, static fn ($n) => $n->type === 'file');
         $this->assertCount(2, $fileNodes, 'Expected source and target file nodes');
     }
+
+    public function testEnterNode_InsideFunction_IncludeEdgeFromFunction(): void
+    {
+        // When include_once is inside a function, the edge source should be
+        // the function node, not the file node — this connects the function to
+        // the included file and prevents orphan function nodes.
+        $this->parse('<?php function load_template() { include_once "templates/header.php"; }');
+
+        $edges = $this->collection->getAllEdges();
+        $includeEdges = array_filter($edges, static fn ($e) => $e->type === 'includes');
+        $this->assertNotEmpty($includeEdges);
+
+        $edge = reset($includeEdges);
+        $this->assertSame('func_load_template', $edge->source, 'Include inside function should use function as edge source');
+    }
+
+    public function testEnterNode_InsideMethod_IncludeEdgeFromMethod(): void
+    {
+        $this->parse('<?php class View { public function render() { include "view.php"; } }');
+
+        $edges = $this->collection->getAllEdges();
+        $includeEdges = array_filter($edges, static fn ($e) => $e->type === 'includes');
+        $this->assertNotEmpty($includeEdges);
+
+        $edge = reset($includeEdges);
+        $this->assertSame('method_View_render', $edge->source, 'Include inside method should use method as edge source');
+    }
+
+    public function testEnterNode_AtFileScope_IncludeEdgeFromFileNode(): void
+    {
+        // File-scope includes still use the file node as source
+        $this->parse('<?php require "bootstrap.php";');
+
+        $edges = $this->collection->getAllEdges();
+        $includeEdges = array_filter($edges, static fn ($e) => $e->type === 'includes');
+        $this->assertNotEmpty($includeEdges);
+
+        $edge = reset($includeEdges);
+        $this->assertStringStartsWith('file_', $edge->source, 'File-scope include should use file as edge source');
+    }
 }

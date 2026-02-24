@@ -309,6 +309,42 @@ class FileScannerTest extends TestCase
         $this->cleanupTempDir($tmpDir);
     }
 
+    public function testScan_SkipsBrowserifyBundle(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/scanner_test_' . uniqid();
+        mkdir($tmpDir, 0777, true);
+
+        // Classic Browserify IIFE wrapper with its distinctive runtime error message
+        $browserify = <<<'JS'
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+"use strict";
+var x = require("./lib");
+},{}]},{},[1]);
+JS;
+        file_put_contents($tmpDir . '/index.js', $browserify);
+
+        $files     = $this->scanner->scan($tmpDir);
+        $basenames = array_map('basename', $files);
+
+        $this->assertNotContains('index.js', $basenames, 'Browserify bundle should be excluded');
+        $this->cleanupTempDir($tmpDir);
+    }
+
+    public function testScan_SkipsWebpackBundle(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/scanner_test_' . uniqid();
+        mkdir($tmpDir, 0777, true);
+
+        $webpack = "var __webpack_require__ = function(moduleId) {\n  return modules[moduleId];\n};\n";
+        file_put_contents($tmpDir . '/app.js', $webpack);
+
+        $files     = $this->scanner->scan($tmpDir);
+        $basenames = array_map('basename', $files);
+
+        $this->assertNotContains('app.js', $basenames, 'Webpack bundle should be excluded');
+        $this->cleanupTempDir($tmpDir);
+    }
+
     private function cleanupTempDir(string $dir): void
     {
         $it = new \RecursiveIteratorIterator(

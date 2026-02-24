@@ -216,4 +216,57 @@ class DataSourceVisitorTest extends TestCase
         $cacheNodes = array_filter($nodes, static fn ($n) => $n->subtype === 'cache' && $n->metadata['operation'] === 'write');
         $this->assertNotEmpty($cacheNodes, 'wp_cache_set should produce a cache write node');
     }
+
+    // ── File-scope (procedural) edge creation ────────────────────────────────
+
+    public function testEnterNode_AtFileScope_CreatesEdgeFromFileNode(): void
+    {
+        // Procedural code: get_option at file scope (not inside any function)
+        $this->parse('<?php get_option("theme_mods");');
+
+        $edges = $this->collection->getAllEdges();
+        $dataEdges = array_filter($edges, static fn ($e) => $e->type === 'reads_data');
+        $this->assertNotEmpty($dataEdges, 'File-scope data call should still produce a reads_data edge');
+
+        $edge = reset($dataEdges);
+        // The source should be a file_ node, not a function
+        $this->assertStringStartsWith('file_', $edge->source, 'Edge source should be a file node at file scope');
+    }
+
+    public function testEnterNode_AtFileScope_CreatesFileNode(): void
+    {
+        $this->parse('<?php update_post_meta($id, "my_key", "val");');
+
+        $nodes = $this->collection->getAllNodes();
+        $fileNodes = array_filter($nodes, static fn ($n) => $n->type === 'file');
+        $this->assertNotEmpty($fileNodes, 'A file node should be created as fallback source');
+    }
+
+    public function testEnterNode_MixedScopes_UsesCorrectSources(): void
+    {
+        // Mix of procedural and function-scoped data calls
+        $code = '<?php
+            get_option("global_setting");
+            function my_func() { get_option("func_setting"); }
+        ';
+        $this->parse($code);
+
+        $edges = $this->collection->getAllEdges();
+        $readEdges = array_filter($edges, static fn ($e) => $e->type === 'reads_data');
+        $this->assertCount(2, $readEdges, 'Both file-scope and function-scope calls should produce edges');
+
+        $sources = array_map(static fn ($e) => $e->source, array_values($readEdges));
+        $hasFileSource = false;
+        $hasFuncSource = false;
+        foreach ($sources as $src) {
+            if (str_starts_with($src, 'file_')) {
+                $hasFileSource = true;
+            }
+            if ($src === 'func_my_func') {
+                $hasFuncSource = true;
+            }
+        }
+        $this->assertTrue($hasFileSource, 'File-scope call should use file node as source');
+        $this->assertTrue($hasFuncSource, 'Function-scope call should use function node as source');
+    }
 }

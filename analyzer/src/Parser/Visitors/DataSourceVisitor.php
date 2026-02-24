@@ -304,13 +304,20 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         );
         $this->collection->addNode($dataNode);
 
-        if ($this->currentFunctionId !== '') {
-            $edgeType  = $operation === 'read' ? 'reads_data' : 'writes_data';
-            $edgeLabel = $operation === 'read' ? 'reads' : 'writes';
-            $edgeMeta  = $apiFunction !== null ? ['api_function' => $apiFunction] : [];
-            $this->collection->addEdge(
-                Edge::make($this->currentFunctionId, $nodeId, $edgeType, $edgeLabel, $edgeMeta)
-            );
+        // Always create an edge: from enclosing function/method if inside one,
+        // or from the file node if in procedural (file-scope) code.  This prevents
+        // data_source nodes in template files from becoming orphans.
+        $callerId = $this->currentFunctionId !== '' ? $this->currentFunctionId : null;
+        if ($callerId === null) {
+            $this->ensureFileNode();
+            $callerId = $this->currentFileNodeId();
         }
+
+        $edgeType  = $operation === 'read' ? 'reads_data' : 'writes_data';
+        $edgeLabel = $operation === 'read' ? 'reads' : 'writes';
+        $edgeMeta  = $apiFunction !== null ? ['api_function' => $apiFunction] : [];
+        $this->collection->addEdge(
+            Edge::make($callerId, $nodeId, $edgeType, $edgeLabel, $edgeMeta)
+        );
     }
 }

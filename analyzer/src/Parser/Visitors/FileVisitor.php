@@ -66,8 +66,14 @@ class FileVisitor extends NamespaceAwareVisitor
             line: $node->getStartLine(),
         ));
 
+        // When the include is inside a function/method, create the edge from
+        // the enclosing caller so that functions using include_once for templates
+        // are connected in the graph.  At file scope, falls back to the file node.
+        $callerId = $this->currentCallerId();
+        $sourceId = $callerId !== null ? $callerId : $currentNodeId;
+
         $this->collection->addEdge(
-            Edge::make($currentNodeId, $includedNodeId, 'includes', 'includes')
+            Edge::make($sourceId, $includedNodeId, 'includes', 'includes')
         );
     }
 
