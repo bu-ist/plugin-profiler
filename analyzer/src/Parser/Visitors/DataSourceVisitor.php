@@ -138,7 +138,7 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         }
 
         $key = $this->resolveKeyArg($node, $subtype);
-        $this->createDataNode($operation, $subtype, $key, $node->getStartLine());
+        $this->createDataNode($operation, $subtype, $key, $node->getStartLine(), $name);
     }
 
     private function handleWpdbCall(Expr\MethodCall $node): void
@@ -172,7 +172,7 @@ class DataSourceVisitor extends NamespaceAwareVisitor
             $key = substr($node->args[0]->value->value, 0, 80);
         }
 
-        $this->createDataNode($operation, 'database', $key, $node->getStartLine());
+        $this->createDataNode($operation, 'database', $key, $node->getStartLine(), '$wpdb->' . $methodName);
     }
 
     /**
@@ -208,7 +208,7 @@ class DataSourceVisitor extends NamespaceAwareVisitor
             return;
         }
 
-        $this->createDataNode($operation, 'database', null, $node->getStartLine());
+        $this->createDataNode($operation, 'database', null, $node->getStartLine(), '$pdo->' . $methodName);
     }
 
     /**
@@ -244,7 +244,7 @@ class DataSourceVisitor extends NamespaceAwareVisitor
             return;
         }
 
-        $this->createDataNode($operation, 'database', null, $node->getStartLine());
+        $this->createDataNode($operation, 'database', null, $node->getStartLine(), '$mysqli->' . $methodName);
     }
 
     private function resolveKeyArg(Expr\FuncCall $node, ?string $subtype): ?string
@@ -273,7 +273,7 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         return null;
     }
 
-    private function createDataNode(string $operation, ?string $subtype, ?string $key, int $line): void
+    private function createDataNode(string $operation, ?string $subtype, ?string $key, int $line, ?string $apiFunction = null): void
     {
         $safeKey = $key ?? ('dynamic_' . $line);
         $nodeId  = 'data_' . $operation . '_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $safeKey);
@@ -296,8 +296,9 @@ class DataSourceVisitor extends NamespaceAwareVisitor
         if ($this->currentFunctionId !== '') {
             $edgeType  = $operation === 'read' ? 'reads_data' : 'writes_data';
             $edgeLabel = $operation === 'read' ? 'reads' : 'writes';
+            $edgeMeta  = $apiFunction !== null ? ['api_function' => $apiFunction] : [];
             $this->collection->addEdge(
-                Edge::make($this->currentFunctionId, $nodeId, $edgeType, $edgeLabel)
+                Edge::make($this->currentFunctionId, $nodeId, $edgeType, $edgeLabel, $edgeMeta)
             );
         }
     }

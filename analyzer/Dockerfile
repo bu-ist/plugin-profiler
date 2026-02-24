@@ -19,7 +19,7 @@ COPY src/ src/
 COPY bin/ bin/
 RUN chmod +x bin/analyze
 
-ENTRYPOINT ["php", "/app/bin/analyze"]
+ENTRYPOINT ["php", "-d", "memory_limit=512M", "/app/bin/analyze"]
 
 # Test stage — installs dev deps + copies tests/
 FROM base AS test

@@ -221,6 +221,7 @@ class GraphBuilder
                 target: $edge->target,
                 type: $edge->type,
                 label: $edge->label,
+                metadata: $edge->metadata,
             );
         }
 

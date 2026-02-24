@@ -7,13 +7,16 @@ namespace PluginProfiler\Command;
 use DateTimeImmutable;
 use PluginProfiler\Export\JsonExporter;
 use PluginProfiler\Graph\CrossReferenceResolver;
+use PluginProfiler\Graph\CyclicDependencyDetector;
 use PluginProfiler\Graph\EntityCollection;
 use PluginProfiler\Graph\GraphBuilder;
 use PluginProfiler\Graph\PluginMetadata;
+use PluginProfiler\Graph\SecurityAnnotator;
 use PluginProfiler\LLM\ApiClient;
 use PluginProfiler\LLM\ClaudeClient;
 use PluginProfiler\LLM\DescriptionGenerator;
 use PluginProfiler\LLM\DocblockDescriptionExtractor;
+use PluginProfiler\LLM\MetadataDescriptionSynthesizer;
 use PluginProfiler\LLM\OllamaClient;
 use PluginProfiler\Parser\PluginParser;
 use PluginProfiler\Parser\Visitors\BlockJsonVisitor;
@@ -79,7 +82,7 @@ class AnalyzeCommand extends Command
         // Step 2: Extract plugin metadata from main file.
         // For WordPress plugins: read the PHP file with "Plugin Name:" header.
         // For WordPress themes: fall back to style.css which carries "Theme Name:".
-        $mainFile   = $scanner->identifyMainPluginFile($allFiles);
+        $mainFile   = $scanner->identifyMainPluginFile($allFiles, $pluginPath);
         $pluginMeta = $this->extractPluginHeader($mainFile);
         if (empty($pluginMeta)) {
             $pluginMeta = $this->extractThemeHeader($pluginPath);
@@ -153,6 +156,13 @@ class AnalyzeCommand extends Command
 
         $graph = (new GraphBuilder())->build($collection, $meta);
 
+        // Step 4c: Security annotation — scan function/method bodies for auth,
+        // nonce, and sanitization patterns, then propagate to connected endpoints.
+        (new SecurityAnnotator())->annotate($graph);
+
+        // Step 4d: Detect circular dependencies along structural edges.
+        $graph->cycles = (new CyclicDependencyDetector())->detect($graph);
+
         // Step 5: LLM descriptions (if requested)
         $noDescriptions = $input->getOption('no-descriptions');
         if (!$noDescriptions) {
@@ -175,9 +185,9 @@ class AnalyzeCommand extends Command
                     $client = new OllamaClient($ollamaHost, $llmModel, $timeout);
                 }
             } elseif ($llmProvider === 'claude') {
-                $client = new ClaudeClient($apiKey, $llmModel, min($timeout, 60));
+                $client = new ClaudeClient($apiKey, $llmModel, $timeout);
             } else {
-                $client = ApiClient::forProvider($llmProvider, $apiKey, $llmModel, min($timeout, 60));
+                $client = ApiClient::forProvider($llmProvider, $apiKey, $llmModel, $timeout);
             }
 
             if ($client !== null) {
@@ -208,6 +218,11 @@ class AnalyzeCommand extends Command
         // Runs regardless of --no-descriptions so entities with PHPDoc comments
         // always get at least a minimal description in the graph output.
         (new DocblockDescriptionExtractor())->extract($graph);
+
+        // Step 5c: Synthesize descriptions from node metadata for any remaining
+        // nodes without descriptions. This ensures --no-descriptions still produces
+        // informative context from structural metadata (params, return types, hooks, etc.).
+        (new MetadataDescriptionSynthesizer())->synthesize($graph);
 
         // Step 6: Export
         $output->writeln(sprintf('<comment>Writing output to %s...</comment>', $outputFile));

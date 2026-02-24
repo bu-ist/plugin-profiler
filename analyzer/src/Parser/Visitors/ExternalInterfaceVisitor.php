@@ -103,11 +103,20 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             return;
         }
 
-        $methods = $this->resolveRestMethods($node->args[2]->value ?? null);
-        $file    = $this->collection->getCurrentFile();
+        $methods    = $this->resolveRestMethods($node->args[2]->value ?? null);
+        $capability = $this->resolvePermissionCallback($node->args[2]->value ?? null);
+        $file       = $this->collection->getCurrentFile();
 
         foreach ($methods as $method) {
             $nodeId = 'rest_' . $method . '_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $namespace . $route);
+
+            $meta = [
+                'http_method' => strtoupper($method),
+                'route'       => $namespace . $route,
+            ];
+            if ($capability !== null) {
+                $meta['capability'] = $capability;
+            }
 
             $this->collection->addNode(GraphNode::make(
                 id: $nodeId,
@@ -115,10 +124,7 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
                 type: 'rest_endpoint',
                 file: $file,
                 line: $node->getStartLine(),
-                metadata: [
-                    'http_method' => strtoupper($method),
-                    'route'       => $namespace . $route,
-                ],
+                metadata: $meta,
             ));
 
             $this->addCallerEdge($nodeId, 'registers_rest');
@@ -352,6 +358,95 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
         }
 
         return ['GET'];
+    }
+
+    /**
+     * Extract permission_callback from the options array of register_rest_route().
+     *
+     * Handles three cases:
+     * 1. String value: '__return_true' or '__return_false'
+     * 2. Closure containing current_user_can('capability') → extract capability
+     * 3. Array with class reference — not resolved (returns null)
+     */
+    private function resolvePermissionCallback(mixed $value): ?string
+    {
+        if ($value === null || !$value instanceof Expr\Array_) {
+            return null;
+        }
+
+        foreach ($value->items as $item) {
+            if (!$item instanceof Node\ArrayItem
+                || !$item->key instanceof Scalar\String_
+                || $item->key->value !== 'permission_callback') {
+                continue;
+            }
+
+            // Case 1: String reference like '__return_true'
+            if ($item->value instanceof Scalar\String_) {
+                return $item->value->value;
+            }
+
+            // Case 2: Closure — scan for current_user_can('capability')
+            if ($item->value instanceof Expr\Closure) {
+                return $this->extractCapabilityFromClosure($item->value);
+            }
+
+            // Case 3: Array callable or variable — unresolvable
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Scan a closure's body for current_user_can('cap') calls and return the capability.
+     */
+    private function extractCapabilityFromClosure(Expr\Closure $closure): ?string
+    {
+        foreach ($closure->stmts ?? [] as $stmt) {
+            $capability = $this->findCapabilityInNode($stmt);
+            if ($capability !== null) {
+                return $capability;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Recursively search an AST node for current_user_can('cap') calls.
+     */
+    private function findCapabilityInNode(Node $node): ?string
+    {
+        if ($node instanceof Expr\FuncCall) {
+            $name = $this->getFuncCallName($node);
+            if ($name === 'current_user_can' && isset($node->args[0])
+                && $node->args[0]->value instanceof Scalar\String_) {
+                return $node->args[0]->value->value;
+            }
+        }
+
+        // Recurse into sub-nodes
+        foreach ($node->getSubNodeNames() as $subName) {
+            $subNode = $node->$subName;
+            if ($subNode instanceof Node) {
+                $result = $this->findCapabilityInNode($subNode);
+                if ($result !== null) {
+                    return $result;
+                }
+            } elseif (is_array($subNode)) {
+                foreach ($subNode as $child) {
+                    if ($child instanceof Node) {
+                        $result = $this->findCapabilityInNode($child);
+                        if ($result !== null) {
+                            return $result;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

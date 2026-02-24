@@ -166,6 +166,46 @@ class ExternalInterfaceVisitorTest extends TestCase
         $this->assertSame('my-plugin/my-block', $block->label);
     }
 
+    public function testEnterNode_WithPermissionCallbackReturnTrue_RecordsCapability(): void
+    {
+        $this->parse('<?php register_rest_route("my/v1", "/items", ["methods" => "GET", "callback" => "get_items", "permission_callback" => "__return_true"]);');
+
+        $nodes = $this->collection->getAllNodes();
+        $restNodes = array_values(array_filter($nodes, static fn ($n) => $n->type === 'rest_endpoint'));
+        $this->assertNotEmpty($restNodes);
+        $this->assertSame('__return_true', $restNodes[0]->metadata['capability']);
+    }
+
+    public function testEnterNode_WithPermissionCallbackClosure_ExtractsCapability(): void
+    {
+        $code = <<<'PHP'
+<?php
+register_rest_route("my/v1", "/items", [
+    "methods" => "GET",
+    "callback" => "get_items",
+    "permission_callback" => function() {
+        return current_user_can("edit_posts");
+    }
+]);
+PHP;
+        $this->parse($code);
+
+        $nodes = $this->collection->getAllNodes();
+        $restNodes = array_values(array_filter($nodes, static fn ($n) => $n->type === 'rest_endpoint'));
+        $this->assertNotEmpty($restNodes);
+        $this->assertSame('edit_posts', $restNodes[0]->metadata['capability']);
+    }
+
+    public function testEnterNode_WithoutPermissionCallback_NullCapability(): void
+    {
+        $this->parse('<?php register_rest_route("my/v1", "/items", ["methods" => "GET", "callback" => "get_items"]);');
+
+        $nodes = $this->collection->getAllNodes();
+        $restNodes = array_values(array_filter($nodes, static fn ($n) => $n->type === 'rest_endpoint'));
+        $this->assertNotEmpty($restNodes);
+        $this->assertArrayNotHasKey('capability', $restNodes[0]->metadata);
+    }
+
     public function testEnterNode_WithWpEnqueueScript_CreatesFileNodeAndEnqueuesEdge(): void
     {
         $this->parse('<?php wp_enqueue_script("my-script", get_plugin_file_uri("js/app.js"), ["jquery"]);');

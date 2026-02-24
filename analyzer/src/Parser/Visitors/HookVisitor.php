@@ -88,15 +88,20 @@ class HookVisitor extends NamespaceAwareVisitor
             $callbackArg = $node->args[1]->value;
             $callbackIds = $this->resolveCallback($callbackArg, $node);
 
+            $hookEdgeMeta = [
+                'priority'  => $this->resolvePriority($node),
+                'hook_type' => $hookType,
+            ];
+
             if (!empty($callbackIds)) {
                 foreach ($callbackIds as $callbackId) {
-                    $this->collection->addEdge(Edge::make($callbackId, $hookId, 'registers_hook', 'registers'));
+                    $this->collection->addEdge(Edge::make($callbackId, $hookId, 'registers_hook', 'registers', $hookEdgeMeta));
                 }
             } else {
                 // Callback unresolved (e.g. file-scope or dynamic): use enclosing caller or file node
                 $this->ensureFileNode();
                 $this->collection->addEdge(
-                    Edge::make($this->currentCallerOrFileId(), $hookId, 'registers_hook', 'registers')
+                    Edge::make($this->currentCallerOrFileId(), $hookId, 'registers_hook', 'registers', $hookEdgeMeta)
                 );
             }
 

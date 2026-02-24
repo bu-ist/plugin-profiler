@@ -132,8 +132,9 @@ function buildSidebarHtml(data) {
   const subtype = data.subtype ? ` / ${data.subtype}` : '';
   const language = JS_TYPES.has(data.type) ? 'javascript' : 'php';
 
-  const connections = buildConnectionsHtml(data);
-  const copyPath    = buildCopyPath(data);
+  const connections    = buildConnectionsHtml(data);
+  const securityBadges = buildSecurityBadgesHtml(data);
+  const copyPath       = buildCopyPath(data);
   // Show absolute host path when available; otherwise strip the /plugin container prefix.
   const displayFile = (copyPath && !copyPath.startsWith('/plugin'))
     ? copyPath   // already includes :line suffix
@@ -154,6 +155,8 @@ function buildSidebarHtml(data) {
       </div>
       <button id="sidebar-close" class="text-gray-400 hover:text-white shrink-0 ml-2" aria-label="Close">&#x2715;</button>
     </div>
+
+    ${securityBadges}
 
     ${data.description
       ? `<div class="mb-3 rounded-lg border border-indigo-800/40 bg-indigo-950/50 p-3">
@@ -179,6 +182,32 @@ function buildSidebarHtml(data) {
   `;
 }
 
+/**
+ * Format edge metadata into a compact inline annotation.
+ * Returns an HTML string (or empty string when no metadata is present).
+ */
+function formatEdgeMeta(metadata) {
+  if (!metadata || typeof metadata !== 'object') return '';
+
+  const parts = [];
+
+  if (metadata.api_function) {
+    parts.push(`via ${metadata.api_function}`);
+  }
+  if (metadata.priority != null && metadata.priority !== 10) {
+    parts.push(`priority ${metadata.priority}`);
+  }
+  if (metadata.hook_type) {
+    parts.push(metadata.hook_type);
+  }
+  if (metadata.http_method) {
+    parts.push(metadata.http_method);
+  }
+
+  if (parts.length === 0) return '';
+  return ` <span class="text-gray-500 text-xs">(${escapeHtml(parts.join(', '))})</span>`;
+}
+
 function buildConnectionsHtml(data) {
   if (!_cy) return '';
 
@@ -195,19 +224,21 @@ function buildConnectionsHtml(data) {
     const otherId = isOutgoing ? edge.data('target') : edge.data('source');
     const otherNode = _cy.getElementById(otherId);
     const otherLabel = otherNode.length ? otherNode.data('label') : otherId;
+    const edgeMeta = edge.data('metadata') || null;
 
     const key = `${isOutgoing ? '→' : '←'} ${type}`;
     if (!groups[key]) groups[key] = [];
-    groups[key].push({ id: otherId, label: otherLabel });
+    groups[key].push({ id: otherId, label: otherLabel, metadata: edgeMeta });
   });
 
-  const html = Object.entries(groups).map(([groupKey, nodes]) => {
-    const items = nodes.map(({ id, label }) =>
-      `<li><button class="text-blue-400 hover:underline text-xs text-left" data-node-id="${escapeHtml(id)}">${escapeHtml(label)}</button></li>`
-    ).join('');
+  const html = Object.entries(groups).map(([groupKey, items]) => {
+    const listItems = items.map(({ id, label, metadata }) => {
+      const annotation = formatEdgeMeta(metadata);
+      return `<li><button class="text-blue-400 hover:underline text-xs text-left" data-node-id="${escapeHtml(id)}">${escapeHtml(label)}</button>${annotation}</li>`;
+    }).join('');
     return `<div class="mb-2">
       <div class="text-xs text-gray-500 font-semibold mb-1">${escapeHtml(groupKey)}</div>
-      <ul class="list-none space-y-0.5 pl-2">${items}</ul>
+      <ul class="list-none space-y-0.5 pl-2">${listItems}</ul>
     </div>`;
   }).join('');
 
@@ -215,6 +246,48 @@ function buildConnectionsHtml(data) {
     <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">Connections</div>
     ${html}
   </div>`;
+}
+
+/**
+ * Build a compact security badge bar for nodes with security annotations.
+ * Shows capability, nonce verification, and sanitization status.
+ * Returns empty string when no security metadata is present.
+ */
+function buildSecurityBadgesHtml(data) {
+  const meta      = data.metadata ?? {};
+  const cap       = meta.capability ?? null;
+  const nonce     = meta.nonce_verified ?? false;
+  const sanitize  = meta.sanitization_count ?? 0;
+
+  // Only show for types that can have security context
+  const secTypes = new Set(['rest_endpoint', 'ajax_handler', 'function', 'method']);
+  if (!secTypes.has(data.type) || (cap === null && !nonce && sanitize === 0)) {
+    return '';
+  }
+
+  const badges = [];
+
+  if (cap !== null) {
+    if (cap === '__return_true') {
+      badges.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-900/60 text-amber-300 border border-amber-700/50">&#x26A0; Public (no auth)</span>');
+    } else {
+      badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-900/60 text-green-300 border border-green-700/50">&#x1F512; ${escapeHtml(cap)}</span>`);
+    }
+  }
+
+  if (nonce) {
+    badges.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-900/60 text-blue-300 border border-blue-700/50">&#x2713; Nonce</span>');
+  } else if (secTypes.has(data.type) && (data.type === 'rest_endpoint' || data.type === 'ajax_handler')) {
+    badges.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-900/60 text-red-300 border border-red-700/50">&#x2717; No nonce</span>');
+  }
+
+  if (sanitize > 0) {
+    badges.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-900/60 text-teal-300 border border-teal-700/50">&#x1F9F9; ${sanitize} sanitize</span>`);
+  }
+
+  if (badges.length === 0) return '';
+
+  return `<div class="flex flex-wrap gap-1.5 mb-3">${badges.join('')}</div>`;
 }
 
 /**

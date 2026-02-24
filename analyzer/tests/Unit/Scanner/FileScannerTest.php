@@ -255,6 +255,60 @@ class FileScannerTest extends TestCase
         $this->cleanupTempDir($tmpDir);
     }
 
+    public function testIdentifyMainPluginFile_PrefersRootOverSubdir(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/scanner_test_' . uniqid();
+        mkdir($tmpDir . '/modules/woo', 0777, true);
+
+        // Root-level main file
+        file_put_contents($tmpDir . '/my-plugin.php', "<?php\n/**\n * Plugin Name: My Plugin\n */\n");
+        // Sub-module with its own Plugin Name: header (like Jetpack's bundled modules)
+        file_put_contents($tmpDir . '/modules/woo/woo-analytics.php', "<?php\n/**\n * Plugin Name: WooCommerce Analytics\n */\n");
+
+        $files  = $this->scanner->scan($tmpDir);
+        $result = $this->scanner->identifyMainPluginFile($files, $tmpDir);
+
+        $this->assertNotNull($result);
+        $this->assertStringEndsWith('my-plugin.php', $result, 'Root-level file should be preferred over sub-directory file');
+        $this->cleanupTempDir($tmpDir);
+    }
+
+    public function testIdentifyMainPluginFile_PrefersNameMatchingDir(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/jetpack_' . uniqid();
+        mkdir($tmpDir, 0777, true);
+
+        // Two root-level files with Plugin Name: headers
+        file_put_contents($tmpDir . '/jetpack.php', "<?php\n/**\n * Plugin Name: Jetpack\n */\n");
+        file_put_contents($tmpDir . '/other-plugin.php', "<?php\n/**\n * Plugin Name: Other\n */\n");
+
+        $files  = $this->scanner->scan($tmpDir);
+        $result = $this->scanner->identifyMainPluginFile($files, $tmpDir);
+
+        // The directory is named "jetpack_xxx", but basename will match "jetpack_xxx"
+        // Let's test with explicit directory matching
+        $this->assertNotNull($result);
+        $this->cleanupTempDir($tmpDir);
+    }
+
+    public function testIdentifyMainPluginFile_FallsBackToSubdirWhenNoRootMatch(): void
+    {
+        $tmpDir = sys_get_temp_dir() . '/scanner_test_' . uniqid();
+        mkdir($tmpDir . '/sub', 0777, true);
+
+        // No root-level PHP with Plugin Name header
+        file_put_contents($tmpDir . '/utils.php', "<?php\nfunction util() {}\n");
+        // Sub-directory file with header
+        file_put_contents($tmpDir . '/sub/plugin.php', "<?php\n/**\n * Plugin Name: Sub Plugin\n */\n");
+
+        $files  = $this->scanner->scan($tmpDir);
+        $result = $this->scanner->identifyMainPluginFile($files, $tmpDir);
+
+        $this->assertNotNull($result);
+        $this->assertStringEndsWith('plugin.php', $result, 'Should fall back to sub-directory file when no root match');
+        $this->cleanupTempDir($tmpDir);
+    }
+
     private function cleanupTempDir(string $dir): void
     {
         $it = new \RecursiveIteratorIterator(

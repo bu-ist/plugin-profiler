@@ -18,7 +18,7 @@ class Node
         public readonly ?string $subtype,
         public readonly string $file,
         public readonly int $line,
-        public readonly array $metadata,
+        public array $metadata,
         public readonly ?string $docblock = null,
     ) {
     }

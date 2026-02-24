@@ -14,6 +14,14 @@ class Graph
     public ?string $aiSummary = null;
 
     /**
+     * Circular dependency cycles detected by CyclicDependencyDetector.
+     * Each cycle is an array of node IDs forming a loop: ['A', 'B', 'C', 'A'].
+     *
+     * @var array<int, array<string>>
+     */
+    public array $cycles = [];
+
+    /**
      * @param array<Node> $nodes
      * @param array<Edge> $edges
      */

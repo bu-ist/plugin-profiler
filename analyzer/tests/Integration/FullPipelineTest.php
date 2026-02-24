@@ -70,7 +70,7 @@ class FullPipelineTest extends TestCase
         $parser->parseJavaScript($jsFiles);
         $parser->parsePhp($phpFiles);
 
-        $mainFile = $scanner->identifyMainPluginFile($allFiles) ?? 'unknown.php';
+        $mainFile = $scanner->identifyMainPluginFile($allFiles, $this->fixtureDir) ?? 'unknown.php';
 
         $meta = new PluginMetadata(
             name: 'Sample Plugin',

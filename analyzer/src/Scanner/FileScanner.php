@@ -241,29 +241,78 @@ class FileScanner
     /**
      * Find the main plugin file by locating the WordPress "Plugin Name:" header.
      *
+     * WordPress convention: the main plugin file lives at the plugin root and
+     * often matches the directory name (e.g. jetpack/jetpack.php).  Large plugins
+     * like Jetpack ship bundled sub-plugins with their own "Plugin Name:" headers
+     * inside subdirectories, so we must prefer root-level matches.
+     *
+     * Priority order:
+     *   1. Root-level .php whose basename matches the plugin directory name
+     *   2. Any other root-level .php with a Plugin Name: header
+     *   3. First sub-directory .php with a Plugin Name: header (fallback)
+     *
      * @param array<string> $files
      */
-    public function identifyMainPluginFile(array $files): ?string
+    public function identifyMainPluginFile(array $files, string $pluginDirectory = ''): ?string
     {
+        $rootCandidates   = [];
+        $subDirFallback   = null;
+        $pluginDirName    = $pluginDirectory !== ''
+            ? basename(rtrim($pluginDirectory, '/\\'))
+            : '';
+
         foreach ($files as $filePath) {
             if (!str_ends_with($filePath, '.php')) {
                 continue;
             }
 
-            $handle = fopen($filePath, 'r');
-            if ($handle === false) {
+            if (!$this->hasPluginNameHeader($filePath)) {
                 continue;
             }
 
-            $header = fread($handle, 8192);
-            fclose($handle);
+            // Determine depth: root-level files have no directory separator
+            // after the plugin base directory.
+            $relative = $pluginDirectory !== ''
+                ? ltrim(str_replace($pluginDirectory, '', $filePath), '/\\')
+                : basename($filePath);
 
-            if ($header !== false && str_contains($header, 'Plugin Name:')) {
-                return $filePath;
+            if (!str_contains($relative, '/') && !str_contains($relative, DIRECTORY_SEPARATOR)) {
+                // Root-level file
+                $rootCandidates[] = $filePath;
+            } elseif ($subDirFallback === null) {
+                $subDirFallback = $filePath;
             }
         }
 
-        return null;
+        // Among root candidates, prefer the one matching the directory name
+        if ($rootCandidates !== []) {
+            foreach ($rootCandidates as $candidate) {
+                $baseName = pathinfo($candidate, PATHINFO_FILENAME);
+                if ($pluginDirName !== '' && $baseName === $pluginDirName) {
+                    return $candidate;
+                }
+            }
+
+            return $rootCandidates[0];
+        }
+
+        return $subDirFallback;
+    }
+
+    /**
+     * Returns true if the file's first 8 KB contains a WordPress "Plugin Name:" header.
+     */
+    private function hasPluginNameHeader(string $filePath): bool
+    {
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            return false;
+        }
+
+        $header = fread($handle, 8192);
+        fclose($handle);
+
+        return $header !== false && str_contains($header, 'Plugin Name:');
     }
 
     /**

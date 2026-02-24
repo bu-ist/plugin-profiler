@@ -28,6 +28,8 @@ let _allNodes   = [];     // full node list from graph-data.json (after render c
 let _allEdges   = [];     // full edge list from graph-data.json (after render cap)
 let _pluginMeta = {};
 let _viewMode   = 'all';  // current edge view mode ('all' | 'structure' | 'behavior')
+let _cycles     = [];     // circular dependency cycles from analyzer
+let _cyclesHighlighted = false; // whether cycle edges are currently highlighted
 
 // ── capElements ───────────────────────────────────────────────────────────────
 
@@ -296,14 +298,14 @@ function applyViewMode() {
  */
 function updateViewModeCounts() {
   if (!_cy) return;
+  const VIEW_LABELS = { requirements: 'Requirements', data: 'Data flow', web: 'Web' };
   document.querySelectorAll('.view-mode-btn[data-view]').forEach((btn) => {
     const view = btn.dataset.view;
     if (view === 'all') return;
     const modeDef = EDGE_VIEW_MODES[view];
     if (!modeDef?.edges) return;
     const count = _cy.edges().filter(e => modeDef.edges.has(e.data('type') || '')).length;
-    const base  = view === 'requirements' ? 'Requirements' : 'Data flow';
-    btn.textContent = `${base} (${count})`;
+    btn.textContent = `${VIEW_LABELS[view] ?? view} (${count})`;
   });
 }
 
@@ -383,6 +385,101 @@ function announce(msg) {
   el.textContent = msg;
   // Reset after a short delay so the same message can be re-announced
   setTimeout(() => { el.textContent = ''; }, 1500);
+}
+
+// ── Cycle highlighting ────────────────────────────────────────────────────────
+
+/**
+ * Build the cycle panel HTML listing each cycle as a clickable chain.
+ * Each cycle is an array of node IDs forming a loop: ['A', 'B', 'C', 'A'].
+ */
+function buildCyclesHtml(cycles) {
+  if (!cycles.length) return '<p class="text-slate-500 text-xs">No circular dependencies.</p>';
+
+  return cycles.map((cycle, i) => {
+    // Look up labels from Cytoscape (if rendered) or fall back to the raw ID
+    const labels = cycle.map(id => {
+      if (_cy) {
+        const node = _cy.getElementById(id);
+        if (node.length) return node.data('label') || id;
+      }
+      return id.replace(/^(class_|func_|method_|file_)/, '');
+    });
+
+    // Remove the closing duplicate for display, then re-add with arrow
+    const display = labels.slice(0, -1);
+    const chain   = display.map(l => escapeHtml(l)).join(' <span class="text-red-500">→</span> ');
+    const closing = escapeHtml(display[0]);
+
+    return `<button data-cycle-index="${i}" class="cycle-item block w-full text-left px-2 py-1.5 rounded hover:bg-slate-700/60 transition-colors group">
+      <div class="text-xs text-slate-300 leading-relaxed">
+        ${chain} <span class="text-red-500">→</span> <span class="text-red-400">${closing}</span>
+      </div>
+      <div class="text-[10px] text-slate-500 group-hover:text-slate-400">${cycle.length - 1} nodes in cycle</div>
+    </button>`;
+  }).join('');
+}
+
+/**
+ * Highlight or un-highlight all edges that participate in cycles.
+ * When highlighting a specific cycle (by index), only that cycle's edges
+ * are highlighted and the graph zooms to fit them.
+ */
+function toggleCycleHighlight(cycleIndex = null) {
+  if (!_cy) return;
+
+  _cy.batch(() => {
+    // Clear previous cycle highlights
+    _cy.elements().removeClass('edge-cycle node-cycle');
+  });
+
+  if (_cyclesHighlighted && cycleIndex === null) {
+    // Toggle off
+    _cyclesHighlighted = false;
+    const btn = document.getElementById('cycles-btn');
+    if (btn) btn.classList.remove('bg-red-700');
+    if (btn) btn.classList.add('bg-gray-700');
+    return;
+  }
+
+  const cyclesToHighlight = cycleIndex !== null ? [_cycles[cycleIndex]] : _cycles;
+
+  _cy.batch(() => {
+    for (const cycle of cyclesToHighlight) {
+      if (!cycle) continue;
+      // Walk consecutive pairs in the cycle path and highlight matching edges
+      for (let i = 0; i < cycle.length - 1; i++) {
+        const src = cycle[i];
+        const tgt = cycle[i + 1];
+        // Highlight the node
+        const srcNode = _cy.getElementById(src);
+        if (srcNode.length) srcNode.addClass('node-cycle');
+        // Find edges between src → tgt
+        const edges = _cy.edges().filter(e =>
+          e.data('source') === src && e.data('target') === tgt
+        );
+        edges.addClass('edge-cycle');
+      }
+    }
+  });
+
+  _cyclesHighlighted = true;
+  const btn = document.getElementById('cycles-btn');
+  if (btn) btn.classList.remove('bg-gray-700');
+  if (btn) btn.classList.add('bg-red-700');
+
+  // If highlighting a specific cycle, zoom to fit those nodes
+  if (cycleIndex !== null && _cycles[cycleIndex]) {
+    const nodeIds = _cycles[cycleIndex].slice(0, -1); // exclude closing duplicate
+    const eles = _cy.collection();
+    nodeIds.forEach(id => {
+      const n = _cy.getElementById(id);
+      if (n.length) eles.merge(n);
+    });
+    if (eles.length) {
+      _cy.animate({ fit: { eles: eles.closedNeighborhood(), padding: 80 } }, { duration: 400 });
+    }
+  }
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -627,6 +724,51 @@ async function main() {
   updateViewModeCounts();
   renderLegend();
 
+  // ── Circular dependency cycles ─────────────────────────────────────────
+  _cycles = graphData.cycles || [];
+  if (_cycles.length > 0) {
+    const cyclesBtn   = document.getElementById('cycles-btn');
+    const cyclesLabel = document.getElementById('cycles-label');
+    const cyclesPanel = document.getElementById('cycles-panel');
+
+    if (cyclesBtn) cyclesBtn.classList.remove('hidden');
+    if (cyclesLabel) cyclesLabel.textContent = `⟳ Cycles (${_cycles.length})`;
+
+    // Populate the panel content
+    const content = document.getElementById('cycles-content');
+    if (content) content.innerHTML = buildCyclesHtml(_cycles);
+
+    // Toggle panel + highlight all cycles
+    cyclesBtn?.addEventListener('click', () => {
+      const isOpen = cyclesPanel?.classList.toggle('hidden') === false;
+      cyclesBtn.setAttribute('aria-expanded', String(isOpen));
+      if (isOpen) {
+        toggleCycleHighlight(); // highlight all
+      } else {
+        // Turn off highlight when closing panel
+        if (_cyclesHighlighted) toggleCycleHighlight();
+      }
+    });
+
+    // Close button inside panel
+    document.getElementById('cycles-panel-close')?.addEventListener('click', () => {
+      cyclesPanel?.classList.add('hidden');
+      cyclesBtn?.setAttribute('aria-expanded', 'false');
+      if (_cyclesHighlighted) toggleCycleHighlight();
+    });
+
+    // Click individual cycle to zoom + highlight just that one
+    cyclesPanel?.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-cycle-index]');
+      if (!item) return;
+      const idx = parseInt(item.dataset.cycleIndex, 10);
+      if (!isNaN(idx)) {
+        _cyclesHighlighted = false; // reset so toggleCycleHighlight re-applies
+        toggleCycleHighlight(idx);
+      }
+    });
+  }
+
   // Legend toggle button
   document.getElementById('legend-btn')?.addEventListener('click', () => {
     const panel = document.getElementById('legend-panel');
@@ -661,6 +803,7 @@ async function main() {
       all:          { active: ['bg-blue-600',   'text-white'],        inactive: ['bg-gray-700', 'text-gray-300'] },
       requirements: { active: ['bg-blue-700',   'text-white'],        inactive: ['bg-gray-700', 'text-blue-300'] },
       data:         { active: ['bg-orange-700', 'text-white'],        inactive: ['bg-gray-700', 'text-orange-300'] },
+      web:          { active: ['bg-cyan-700',   'text-white'],        inactive: ['bg-gray-700', 'text-cyan-300'] },
     };
     document.querySelectorAll('.view-mode-btn').forEach((b) => {
       const isActive = b.dataset.view === mode;
@@ -675,8 +818,8 @@ async function main() {
 
     // Announce the mode change for screen readers
     const visibleCount = _cy.edges().filter(e => !e.hasClass('view-hidden')).length;
-    const modeLabel = mode === 'all' ? 'All' : mode === 'requirements' ? 'Requirements' : 'Data flow';
-    announce(`Showing ${modeLabel} edges: ${visibleCount} visible`);
+    const modeLabels = { all: 'All', requirements: 'Requirements', data: 'Data flow', web: 'Web' };
+    announce(`Showing ${modeLabels[mode] ?? mode} edges: ${visibleCount} visible`);
   });
 
   // Arrow-key navigation within the view mode toolbar (roving tabindex)

@@ -280,6 +280,27 @@ function buildStylesheet() {
       selector: 'node.view-dimmed',
       style: { 'opacity': 0.12, 'text-opacity': 0 },
     },
+    // ── Circular dependency cycle edges — red glow ────────────────────────
+    {
+      selector: 'edge.edge-cycle',
+      style: {
+        'line-color':         '#EF4444',
+        'target-arrow-color': '#EF4444',
+        'width':              4,
+        'z-index':            10,
+        'overlay-color':      '#EF4444',
+        'overlay-padding':    3,
+        'overlay-opacity':    0.15,
+      },
+    },
+    {
+      selector: 'node.node-cycle',
+      style: {
+        'border-color': '#EF4444',
+        'border-width': 3,
+        'z-index':      10,
+      },
+    },
     // ── Selection / highlight ring ────────────────────────────────────────
     {
       selector: 'node:selected',

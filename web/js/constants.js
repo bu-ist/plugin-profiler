@@ -149,59 +149,82 @@ export const EDGE_VIEW_MODES = {
       'calls_endpoint', 'calls_ajax_handler', 'js_block_matches_php',
     ]),
   },
+  web: {
+    label: 'Web',
+    // User-facing surface: what renders in the browser, what the frontend JS
+    // calls, what admin pages and shortcodes exist. Focuses on the bridge
+    // between frontend code and the WordPress backend.
+    edges: new Set([
+      // Block rendering and asset enqueueing
+      'renders_block', 'registers_block', 'enqueues_script',
+      // Frontend registrations (shortcodes, admin pages, AJAX, REST)
+      'registers_shortcode', 'registers_page', 'registers_ajax', 'registers_rest',
+      // Cross-language JS → PHP calls (frontend consuming backend)
+      'calls_endpoint', 'calls_ajax_handler', 'js_block_matches_php',
+      // WordPress data stores (editor UI)
+      'reads_store', 'writes_store',
+      // JS hooks (frontend-side hook system)
+      'js_registers_hook', 'uses_hook',
+      // JS module imports (frontend dependency chain)
+      'imports',
+    ]),
+  },
 };
 
 /**
  * EDGE_TYPE_META — per-edge-type visual metadata for the legend panel.
  *
  * Each entry records the colour, line-style, arrow-shape, colour-family name,
- * and which view mode the edge belongs to.  This is the single source of truth
+ * and which view modes the edge belongs to.  This is the single source of truth
  * consumed by the legend renderer; graph.js EDGE_STYLES is the Cytoscape-
  * specific counterpart (kept separate because selectors differ).
  *
- * @type {Record<string, { color: string, lineStyle: string, arrowShape: string, family: string, mode: string }>}
+ * `modes` is an array so edges can appear in multiple view modes (e.g.
+ * registers_rest belongs to both "data" and "web").
+ *
+ * @type {Record<string, { color: string, lineStyle: string, arrowShape: string, family: string, modes: string[] }>}
  */
 export const EDGE_TYPE_META = {
   // ── Requirements (structural) ───────────────────────────────────────────
-  extends:             { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   mode: 'requirements' },
-  implements:          { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   mode: 'requirements' },
-  uses_trait:          { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   mode: 'requirements' },
-  instantiates:        { color: '#2DD4BF', lineStyle: 'dotted', arrowShape: 'diamond',           family: 'Instantiation', mode: 'requirements' },
-  calls:               { color: '#94A3B8', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Calls',         mode: 'requirements' },
-  has_method:          { color: '#94A3B8', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Structure',     mode: 'requirements' },
-  includes:            { color: '#94A3B8', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Structure',     mode: 'requirements' },
-  defines:             { color: '#94A3B8', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Structure',     mode: 'requirements' },
-  defines_component:   { color: '#06B6D4', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Structure',     mode: 'requirements' },
-  imports:             { color: '#818CF8', lineStyle: 'dashed', arrowShape: 'chevron',           family: 'JS imports',    mode: 'requirements' },
+  extends:             { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   modes: ['requirements'] },
+  implements:          { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   modes: ['requirements'] },
+  uses_trait:          { color: '#60A5FA', lineStyle: 'solid',  arrowShape: 'vee',               family: 'Inheritance',   modes: ['requirements'] },
+  instantiates:        { color: '#2DD4BF', lineStyle: 'dotted', arrowShape: 'diamond',           family: 'Instantiation', modes: ['requirements'] },
+  calls:               { color: '#94A3B8', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Calls',         modes: ['requirements'] },
+  has_method:          { color: '#94A3B8', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Structure',     modes: ['requirements'] },
+  includes:            { color: '#94A3B8', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Structure',     modes: ['requirements'] },
+  defines:             { color: '#94A3B8', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Structure',     modes: ['requirements'] },
+  defines_component:   { color: '#06B6D4', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Structure',     modes: ['requirements'] },
+  imports:             { color: '#818CF8', lineStyle: 'dashed', arrowShape: 'chevron',           family: 'JS imports',    modes: ['requirements', 'web'] },
 
   // ── Data (runtime) ──────────────────────────────────────────────────────
-  registers_hook:      { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         mode: 'data' },
-  triggers_hook:       { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         mode: 'data' },
-  triggers_handler:    { color: '#FB923C', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Hooks',         mode: 'data' },
-  js_registers_hook:   { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         mode: 'data' },
-  uses_hook:           { color: '#FB923C', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Hooks',         mode: 'data' },
-  deregisters_hook:    { color: '#F87171', lineStyle: 'dashed', arrowShape: 'tee',               family: 'Deregister',    mode: 'data' },
-  reads_data:          { color: '#C084FC', lineStyle: 'solid',  arrowShape: 'square',            family: 'Data',          mode: 'data' },
-  writes_data:         { color: '#C084FC', lineStyle: 'dashed', arrowShape: 'square',            family: 'Data',          mode: 'data' },
-  reads_store:         { color: '#FCD34D', lineStyle: 'solid',  arrowShape: 'diamond',           family: 'WP store',      mode: 'data' },
-  writes_store:        { color: '#FCD34D', lineStyle: 'dashed', arrowShape: 'diamond',           family: 'WP store',      mode: 'data' },
-  http_request:        { color: '#F87171', lineStyle: 'solid',  arrowShape: 'tee',               family: 'HTTP',          mode: 'data' },
-  http_call:           { color: '#F87171', lineStyle: 'solid',  arrowShape: 'tee',               family: 'HTTP',          mode: 'data' },
-  renders_block:       { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        mode: 'data' },
-  registers_block:     { color: '#F472B6', lineStyle: 'dashed', arrowShape: 'circle',            family: 'Blocks',        mode: 'data' },
-  enqueues_script:     { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        mode: 'data' },
-  registers:           { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_rest:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_shortcode: { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_page:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_ajax:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_post_type: { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  registers_taxonomy:  { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  schedules_cron:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  js_api_call:         { color: '#4ADE80', lineStyle: 'solid',  arrowShape: 'triangle-backcurve', family: 'Registration', mode: 'data' },
-  calls_endpoint:      { color: '#F472B6', lineStyle: 'solid',  arrowShape: 'circle',            family: 'Cross-lang',   mode: 'data' },
-  calls_ajax_handler:  { color: '#F472B6', lineStyle: 'dashed', arrowShape: 'circle',            family: 'Cross-lang',   mode: 'data' },
-  js_block_matches_php:{ color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Cross-lang',   mode: 'data' },
+  registers_hook:      { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         modes: ['data'] },
+  triggers_hook:       { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         modes: ['data'] },
+  triggers_handler:    { color: '#FB923C', lineStyle: 'solid',  arrowShape: 'triangle',          family: 'Hooks',         modes: ['data'] },
+  js_registers_hook:   { color: '#FB923C', lineStyle: 'dashed', arrowShape: 'triangle',          family: 'Hooks',         modes: ['data', 'web'] },
+  uses_hook:           { color: '#FB923C', lineStyle: 'dotted', arrowShape: 'triangle',          family: 'Hooks',         modes: ['data', 'web'] },
+  deregisters_hook:    { color: '#F87171', lineStyle: 'dashed', arrowShape: 'tee',               family: 'Deregister',    modes: ['data'] },
+  reads_data:          { color: '#C084FC', lineStyle: 'solid',  arrowShape: 'square',            family: 'Data',          modes: ['data'] },
+  writes_data:         { color: '#C084FC', lineStyle: 'dashed', arrowShape: 'square',            family: 'Data',          modes: ['data'] },
+  reads_store:         { color: '#FCD34D', lineStyle: 'solid',  arrowShape: 'diamond',           family: 'WP store',      modes: ['data', 'web'] },
+  writes_store:        { color: '#FCD34D', lineStyle: 'dashed', arrowShape: 'diamond',           family: 'WP store',      modes: ['data', 'web'] },
+  http_request:        { color: '#F87171', lineStyle: 'solid',  arrowShape: 'tee',               family: 'HTTP',          modes: ['data'] },
+  http_call:           { color: '#F87171', lineStyle: 'solid',  arrowShape: 'tee',               family: 'HTTP',          modes: ['data'] },
+  renders_block:       { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
+  registers_block:     { color: '#F472B6', lineStyle: 'dashed', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
+  enqueues_script:     { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
+  registers:           { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
+  registers_rest:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },
+  registers_shortcode: { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },
+  registers_page:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },
+  registers_ajax:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },
+  registers_post_type: { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
+  registers_taxonomy:  { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
+  schedules_cron:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
+  js_api_call:         { color: '#4ADE80', lineStyle: 'solid',  arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
+  calls_endpoint:      { color: '#F472B6', lineStyle: 'solid',  arrowShape: 'circle',            family: 'Cross-lang',   modes: ['data', 'web'] },
+  calls_ajax_handler:  { color: '#F472B6', lineStyle: 'dashed', arrowShape: 'circle',            family: 'Cross-lang',   modes: ['data', 'web'] },
+  js_block_matches_php:{ color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Cross-lang',   modes: ['data', 'web'] },
 };
 
 /** Return the Cytoscape fill colour for a node type (fallback: gray). */

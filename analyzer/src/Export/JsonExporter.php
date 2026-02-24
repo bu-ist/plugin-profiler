@@ -77,13 +77,15 @@ class JsonExporter
                     $graph->nodes,
                 ),
             ],
-            'edges' => array_map(fn ($e) => ['data' => [
-                'id'     => $e->id,
-                'source' => $e->source,
-                'target' => $e->target,
-                'type'   => $e->type,
-                'label'  => $e->label,
-            ]], $graph->edges),
+            'edges' => array_map(fn ($e) => ['data' => array_filter([
+                'id'       => $e->id,
+                'source'   => $e->source,
+                'target'   => $e->target,
+                'type'     => $e->type,
+                'label'    => $e->label,
+                'metadata' => $e->metadata ?: null,
+            ], fn ($v) => $v !== null)], $graph->edges),
+            'cycles' => $graph->cycles,
         ];
 
         $json = json_encode(
@@ -279,6 +281,10 @@ class JsonExporter
             'block_attributes' => null,
             'render_template'  => null,
             'js_assets'        => null,
+            // Security annotations (from SecurityAnnotator)
+            'capability'         => null,
+            'nonce_verified'     => null,
+            'sanitization_count' => null,
         ];
 
         return array_merge($defaults, $metadata);
