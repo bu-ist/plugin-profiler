@@ -173,30 +173,98 @@ function showStatusBanner(focusCount, totalCount, isFocused) {
   // No banner needed when every node is visible
   if (!isFocused || focusCount >= totalCount) return;
 
-  // Use fixed positioning so the banner floats above the Cytoscape canvas
-  // without being clipped or intercepted by canvas pointer events.
-  // Bottom-center placement keeps it out of the graph workspace.
+  // Use inline styles for ALL critical layout properties — Tailwind CDN may not
+  // generate utility classes used only in JavaScript-created elements.  Inline
+  // styles also guarantee the banner renders above Cytoscape's canvas layer
+  // (which sets position:relative on #cy) regardless of stacking-context quirks.
   const banner = document.createElement('div');
   banner.id = 'status-banner';
   banner.setAttribute('role', 'status');
   banner.setAttribute('aria-live', 'polite');
   banner.setAttribute('aria-atomic', 'true');
-  banner.className = 'fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded px-4 py-2 flex items-center gap-3 shadow-lg whitespace-nowrap';
+  // Visual-only Tailwind classes (colours, border, text) — layout handled inline
+  banner.className = 'bg-slate-800 border border-slate-600 text-slate-300 text-xs rounded shadow-lg whitespace-nowrap';
+  // Inline styles for positioning, z-index, and pointer-events — these MUST NOT
+  // rely on Tailwind CDN class generation to work.
+  banner.style.cssText = 'position:fixed; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:9999; pointer-events:auto; display:flex; align-items:center; gap:0; padding:0; user-select:none;';
   banner.innerHTML = `
-    <span>⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.</span>
-    <button data-banner-action="show-all" class="text-blue-400 hover:text-blue-300 underline" title="Switch to full graph view">Show all →</button>
-    <button data-banner-action="dismiss" class="ml-1 text-slate-400 hover:text-white text-sm leading-none" title="Dismiss">✕</button>
+    <span data-banner-drag class="flex items-center gap-1 px-3 py-2 cursor-grab" style="pointer-events:auto;" title="Drag to reposition">
+      <span class="text-slate-500 text-[10px] leading-none mr-1" aria-hidden="true">⠿</span>
+      ⊙ Showing <strong class="text-white">${focusCount}</strong> of ${totalCount} nodes — key nodes by connectivity.
+    </span>
+    <button data-banner-action="show-all" class="text-blue-400 hover:text-blue-300 hover:bg-slate-700/60 underline cursor-pointer px-2 py-2 rounded-r transition-colors" style="pointer-events:auto; position:relative; z-index:1;" title="Switch to full graph view">Show all →</button>
+    <button data-banner-action="dismiss" class="text-slate-400 hover:text-white hover:bg-slate-700/60 text-sm leading-none cursor-pointer px-2 py-2 transition-colors" style="pointer-events:auto; position:relative; z-index:1;" title="Dismiss">✕</button>
   `;
   document.body.appendChild(banner);
 
-  // Use event delegation on the banner container — same pattern as sidebar-close.
-  // Querying individual child IDs after appendChild can silently fail when the
-  // banner is re-created quickly (e.g. focus toggle), so delegation on the
-  // parent element is more reliable.
+  // ── Drag-to-reposition ──────────────────────────────────────────────────
+  // The drag handle is the text area (not the action buttons).  On drag start
+  // we switch from the centered transform to explicit top/left so the banner
+  // follows the cursor exactly.
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  const dragHandle = banner.querySelector('[data-banner-drag]');
+
+  function onDragStart(e) {
+    // Only left mouse button
+    if (e.button !== 0) return;
+    isDragging = true;
+    const rect = banner.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    // Switch from centered-bottom to absolute top/left positioning
+    banner.style.bottom = 'auto';
+    banner.style.left = rect.left + 'px';
+    banner.style.top = rect.top + 'px';
+    banner.style.transform = 'none';
+    dragHandle.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+
+  function onDragMove(e) {
+    if (!isDragging) return;
+    const x = e.clientX - dragOffsetX;
+    const y = e.clientY - dragOffsetY;
+    // Clamp to viewport
+    const rect = banner.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width;
+    const maxY = window.innerHeight - rect.height;
+    banner.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+    banner.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+    e.preventDefault();
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    dragHandle.style.cursor = 'grab';
+  }
+
+  dragHandle.addEventListener('mousedown', onDragStart);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+
+  // Clean up document-level listeners when banner is removed
+  const observer = new MutationObserver(() => {
+    if (!document.getElementById('status-banner')) {
+      document.removeEventListener('mousemove', onDragMove);
+      document.removeEventListener('mouseup', onDragEnd);
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { childList: true });
+
+  // ── Button click actions ────────────────────────────────────────────────
+  // Event delegation on the banner container — buttons handle show-all and
+  // dismiss. Clicks on the drag handle area (without dragging) are ignored
+  // since there's no action associated with the text.
   banner.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-banner-action]');
     if (!btn) return;
     e.stopPropagation();
+    e.preventDefault();
     if (btn.dataset.bannerAction === 'dismiss') {
       banner.remove();
     } else if (btn.dataset.bannerAction === 'show-all') {
