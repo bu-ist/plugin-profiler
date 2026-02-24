@@ -20,8 +20,9 @@ web/node_modules/
 web/package-lock.json
 
 # ─── Docker ─────────────────────────────────────────────────────────────────
-# Local output from docker compose runs
-output/
+# Local output from docker compose runs (keep the directory for Docker mounts)
+output/*
+!output/.gitkeep
 
 # ─── OS ─────────────────────────────────────────────────────────────────────
 .DS_Store
