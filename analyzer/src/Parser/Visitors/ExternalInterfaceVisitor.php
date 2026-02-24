@@ -80,13 +80,14 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
 
     /**
      * Add an edge from the current enclosing method/function to the given node ID.
-     * Edge type is 'registers' — the caller is what registers/creates this entity.
+     * The $type parameter is used as both the Cytoscape edge type (for styling/filtering)
+     * and falls back to a readable label.
      */
-    private function addCallerEdge(string $targetId, string $label = 'registers'): void
+    private function addCallerEdge(string $targetId, string $type = 'registers', string $label = ''): void
     {
         $this->ensureFileNode();
         $this->collection->addEdge(
-            Edge::make($this->currentCallerOrFileId(), $targetId, 'registers', $label)
+            Edge::make($this->currentCallerOrFileId(), $targetId, $type, $label ?: 'registers')
         );
     }
 
@@ -490,7 +491,7 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
      * Script registration: wp_enqueue_script($handle, $src, $deps, $ver, $args) and
      * wp_register_script($handle, $src, $deps, $ver, $strategy).
      *
-     * Creates a `file` node keyed by the handle and an `enqueues_script` edge
+     * Creates a `script` node keyed by the handle and an `enqueues_script` edge
      * from the enclosing function/file to that node.
      */
     private function handleEnqueueScript(Expr\FuncCall $node): void
@@ -510,10 +511,9 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             $this->collection->addNode(GraphNode::make(
                 id: $nodeId,
                 label: $handle,
-                type: 'file',
+                type: 'script',
                 file: $this->collection->getCurrentFile(),
                 line: $node->getStartLine(),
-                subtype: 'script',
             ));
         }
 
@@ -527,7 +527,7 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
 
     /**
      * Style registration: wp_enqueue_style($handle, ...) and wp_register_style($handle, ...).
-     * Mirrors handleEnqueueScript — creates a `file` node for the stylesheet handle.
+     * Creates a `style` node for the stylesheet handle.
      */
     private function handleEnqueueStyle(Expr\FuncCall $node): void
     {
@@ -546,14 +546,18 @@ class ExternalInterfaceVisitor extends NamespaceAwareVisitor
             $this->collection->addNode(GraphNode::make(
                 id: $nodeId,
                 label: $handle,
-                type: 'file',
+                type: 'style',
                 file: $this->collection->getCurrentFile(),
                 line: $node->getStartLine(),
-                subtype: 'style',
             ));
         }
 
-        $this->addCallerEdge($nodeId, 'enqueues_script');
+        // Use enqueues_style as the Cytoscape edge type directly so it matches
+        // the constant in EDGE_TYPE_META (same approach as enqueues_script above).
+        $this->ensureFileNode();
+        $this->collection->addEdge(
+            Edge::make($this->currentCallerOrFileId(), $nodeId, 'enqueues_style', 'enqueues')
+        );
     }
 
     private function resolveStringArg(Expr $expr): ?string

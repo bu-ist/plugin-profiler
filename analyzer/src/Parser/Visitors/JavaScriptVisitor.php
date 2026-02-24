@@ -142,7 +142,9 @@ class JavaScriptVisitor
                 break;
 
             case 'react_hook':
-                $nodeId = GraphNode::sanitizeId('react_hook_' . $subtype . '_' . $name . '_' . md5($filePath . $l));
+                // Deduplicate per file: one node per hook name per file, not per call site.
+                // Multiple useState() calls in the same file don't need separate nodes.
+                $nodeId = GraphNode::sanitizeId('react_hook_' . $subtype . '_' . $name . '_' . md5($filePath));
                 $this->addNode($nodeId, $name, 'react_hook', $filePath, $l, array_merge($meta, ['hook_kind' => $subtype]));
                 $this->addEdge($fileNodeId, $nodeId, 'uses_hook', 'uses');
                 break;

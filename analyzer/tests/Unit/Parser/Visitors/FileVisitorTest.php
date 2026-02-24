@@ -63,16 +63,15 @@ class FileVisitorTest extends TestCase
         $this->assertNotEmpty($fileNodes);
     }
 
-    public function testEnterNode_WithDynamicPath_CreatesEdgeWithDynamicTarget(): void
+    public function testEnterNode_WithDynamicPath_SkipsUnresolvableInclude(): void
     {
+        // Unresolvable dynamic includes (variable paths) are skipped entirely
+        // to avoid creating noise nodes with generic "dynamic" labels.
         $this->parse('<?php require $dynamic_path;');
 
         $edges = $this->collection->getAllEdges();
         $includeEdges = array_filter($edges, static fn ($e) => $e->type === 'includes');
-        $this->assertNotEmpty($includeEdges);
-
-        $edge = reset($includeEdges);
-        $this->assertStringContainsString('dynamic', $edge->target);
+        $this->assertEmpty($includeEdges, 'Dynamic includes should be skipped');
     }
 
     public function testEnterNode_WithPluginDirPath_ResolvesLabel(): void

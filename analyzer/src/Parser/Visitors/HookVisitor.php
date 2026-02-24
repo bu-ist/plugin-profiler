@@ -53,19 +53,23 @@ class HookVisitor extends NamespaceAwareVisitor
 
         $hookNameArg = $node->args[0]->value;
         $hookName    = $this->resolveHookName($hookNameArg, $node);
+
+        // Skip unresolvable dynamic hook names — they produce generic "dynamic"
+        // nodes that add noise without conveying meaningful architecture info.
+        if (str_starts_with($hookName, 'dynamic_')) {
+            return;
+        }
+
         $isFilter    = in_array($funcName, ['add_filter', 'apply_filters', 'apply_filters_ref_array'], true);
         $hookType    = $isFilter ? 'filter' : 'action';
         $hookId      = 'hook_' . $hookType . '_' . $hookName;
-
-        // Dynamic hook names get a readable label instead of the hash used for ID uniqueness
-        $hookLabel = str_starts_with($hookName, 'dynamic_') ? 'dynamic' : $hookName;
 
         $file = $this->collection->getCurrentFile();
 
         // Create or ensure hook node exists
         $hookNode = GraphNode::make(
             id: $hookId,
-            label: $hookLabel,
+            label: $hookName,
             type: 'hook',
             file: $file,
             line: $node->getStartLine(),
@@ -140,16 +144,19 @@ class HookVisitor extends NamespaceAwareVisitor
         }
 
         $hookName = $this->resolveHookName($node->args[0]->value, $node);
+
+        if (str_starts_with($hookName, 'dynamic_')) {
+            return;
+        }
+
         $isFilter = in_array($funcName, ['remove_filter', 'remove_all_filters'], true);
         $hookType = $isFilter ? 'filter' : 'action';
         $hookId   = 'hook_' . $hookType . '_' . $hookName;
 
-        $hookLabel = str_starts_with($hookName, 'dynamic_') ? 'dynamic' : $hookName;
-
         // Ensure the hook node exists so the edge target is valid
         $this->collection->addNode(GraphNode::make(
             id: $hookId,
-            label: $hookLabel,
+            label: $hookName,
             type: 'hook',
             file: $this->collection->getCurrentFile(),
             line: $node->getStartLine(),

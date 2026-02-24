@@ -70,6 +70,11 @@ export const NODE_TYPES = {
   // bg-gray-600 = 7.3:1 ✅
   file:             { color: '#6B7280', shape: 'rectangle',       badge: 'bg-gray-600' },
 
+  // ── Enqueued assets — yellow / indigo ────────────────────────────────────
+  // bg-yellow-700 = 5.5:1 ✅   bg-indigo-600 = 7.2:1 ✅
+  script:           { color: '#EAB308', shape: 'tag',             badge: 'bg-yellow-700' },
+  style:            { color: '#818CF8', shape: 'tag',             badge: 'bg-indigo-600' },
+
   // ── Gutenberg — pink ──────────────────────────────────────────────────────
   // bg-pink-700 = 6.1:1 ✅
   gutenberg_block:  { color: '#EC4899', shape: 'round-rectangle', badge: 'bg-pink-700' },
@@ -142,7 +147,7 @@ export const EDGE_VIEW_MODES = {
       // Outbound HTTP (PHP: http_request, JS: http_call)
       'http_request', 'http_call',
       // Block rendering and asset enqueueing
-      'renders_block', 'registers_block', 'enqueues_script',
+      'renders_block', 'registers_block', 'enqueues_script', 'enqueues_style',
       // JS WordPress hooks and API calls
       'uses_hook', 'js_api_call',
       // Cross-language JS → PHP calls
@@ -156,7 +161,7 @@ export const EDGE_VIEW_MODES = {
     // between frontend code and the WordPress backend.
     edges: new Set([
       // Block rendering and asset enqueueing
-      'renders_block', 'registers_block', 'enqueues_script',
+      'renders_block', 'registers_block', 'enqueues_script', 'enqueues_style',
       // Frontend registrations (shortcodes, admin pages, AJAX, REST)
       'registers_shortcode', 'registers_page', 'registers_ajax', 'registers_rest',
       // Cross-language JS → PHP calls (frontend consuming backend)
@@ -212,7 +217,8 @@ export const EDGE_TYPE_META = {
   http_call:           { color: '#F87171', lineStyle: 'solid',  arrowShape: 'tee',               family: 'HTTP',          modes: ['data'] },
   renders_block:       { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
   registers_block:     { color: '#F472B6', lineStyle: 'dashed', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
-  enqueues_script:     { color: '#F472B6', lineStyle: 'dotted', arrowShape: 'circle',            family: 'Blocks',        modes: ['data', 'web'] },
+  enqueues_script:     { color: '#EAB308', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Assets',        modes: ['data', 'web'] },
+  enqueues_style:      { color: '#818CF8', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Assets',        modes: ['data', 'web'] },
   registers:           { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data'] },
   registers_rest:      { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },
   registers_shortcode: { color: '#4ADE80', lineStyle: 'dashed', arrowShape: 'triangle-backcurve', family: 'Registration', modes: ['data', 'web'] },

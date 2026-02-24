@@ -425,20 +425,19 @@ class MetadataDescriptionSynthesizerTest extends TestCase
 
     // ── File tests ───────────────────────────────────────────────────────────
 
-    public function testSynthesize_File_Script(): void
+    public function testSynthesize_Script(): void
     {
         $node = Node::make(
             id: 'script_my_plugin_admin',
             label: 'my-plugin-admin',
-            type: 'file',
+            type: 'script',
             file: '/plugin/js/admin.js',
-            subtype: 'script',
         );
         $graph = $this->buildGraph([$node]);
 
         $this->synthesizer->synthesize($graph);
 
-        $this->assertSame('Enqueued JavaScript asset.', $node->description);
+        $this->assertSame('Enqueued JavaScript asset (handle: my-plugin-admin).', $node->description);
     }
 
     public function testSynthesize_File_WithIncludes(): void

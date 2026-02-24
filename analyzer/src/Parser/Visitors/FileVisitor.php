@@ -47,19 +47,22 @@ class FileVisitor extends NamespaceAwareVisitor
             line: 0,
         ));
 
-        $includedPath  = $this->resolveIncludePath($node->expr, $currentFile);
-        $includedRelPath = $includedPath !== null ? $this->toRelative($includedPath) : null;
-        $includedNodeId = 'file_' . preg_replace(
-            '/[^a-zA-Z0-9_\-.]/',
-            '_',
-            $includedRelPath ?? ('dynamic_' . $node->getStartLine())
-        );
+        $includedPath = $this->resolveIncludePath($node->expr, $currentFile);
+
+        // Skip unresolvable dynamic includes — they create noise with generic
+        // "dynamic" labels that convey no meaningful information.
+        if ($includedPath === null) {
+            return;
+        }
+
+        $includedRelPath = $this->toRelative($includedPath);
+        $includedNodeId  = 'file_' . preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $includedRelPath);
 
         $this->collection->addNode(GraphNode::make(
             id: $includedNodeId,
-            label: $includedPath !== null ? basename($includedPath) : 'dynamic',
+            label: basename($includedPath),
             type: 'file',
-            file: $includedPath ?? $currentFile,
+            file: $includedPath,
             line: $node->getStartLine(),
         ));
 

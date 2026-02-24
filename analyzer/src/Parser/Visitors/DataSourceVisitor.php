@@ -275,13 +275,24 @@ class DataSourceVisitor extends NamespaceAwareVisitor
 
     private function createDataNode(string $operation, ?string $subtype, ?string $key, int $line, ?string $apiFunction = null): void
     {
-        $safeKey = $key ?? ('dynamic_' . $line);
-        $nodeId  = 'data_' . $operation . '_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $safeKey);
-        $file    = $this->collection->getCurrentFile();
+        // For database operations (wpdb, PDO, MySQLi) the key is often null
+        // because it's raw SQL, not a named option/meta key. Use a fallback.
+        // For keyed APIs (options, meta, transients, cache), skip unresolvable
+        // dynamic keys — each creates a separate noise node.
+        if ($key === null) {
+            if ($subtype === 'database') {
+                $key = $subtype;
+            } else {
+                return;
+            }
+        }
+
+        $nodeId = 'data_' . $operation . '_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $key);
+        $file   = $this->collection->getCurrentFile();
 
         $dataNode = GraphNode::make(
             id: $nodeId,
-            label: $key ?? 'dynamic key',
+            label: $key,
             type: 'data_source',
             file: $file,
             line: $line,

@@ -89,7 +89,12 @@ const EDGE_STYLES = [
   // Block rendering and asset enqueueing — dotted pink, circle arrow
   {
     selector: 'edge[type="renders_block"], edge[type="enqueues_script"]',
-    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#F472B6', 'target-arrow-color': '#F472B6', 'target-arrow-shape': 'circle' },
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#EAB308', 'target-arrow-color': '#EAB308', 'target-arrow-shape': 'circle' },
+  },
+  // Style enqueueing — dotted indigo, circle arrow
+  {
+    selector: 'edge[type="enqueues_style"]',
+    style:    { 'width': 2.5, 'line-style': 'dotted', 'line-color': '#818CF8', 'target-arrow-color': '#818CF8', 'target-arrow-shape': 'circle' },
   },
   // Registration edges — dashed green, triangle-backcurve arrow
   {

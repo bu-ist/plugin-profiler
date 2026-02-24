@@ -17,7 +17,17 @@ export function initSearch(cy, allNodes = null) {
   _cy = cy;
   _allNodes = allNodes;
 
-  const allTypes = new Set(cy.nodes().map((n) => n.data('type')));
+  // Build type set from the FULL node list (not just the focus subset),
+  // so all types get toggle buttons even if some are outside the initial view.
+  // Exclude compound grouping types (namespace, dir) — they're structural, not
+  // entity types that users want to filter.
+  const STRUCTURAL_TYPES = new Set(['namespace', 'dir']);
+  const allTypes = new Set(
+    (allNodes && allNodes.length
+      ? allNodes.map((n) => (n.data ? n.data.type : n.type)).filter(Boolean)
+      : cy.nodes().map((n) => n.data('type'))
+    ).filter((t) => !STRUCTURAL_TYPES.has(t))
+  );
   _activeTypes = new Set(allTypes);
 
   buildTypeFilters(allTypes);

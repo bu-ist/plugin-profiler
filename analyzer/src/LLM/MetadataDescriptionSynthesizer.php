@@ -98,6 +98,8 @@ class MetadataDescriptionSynthesizer
             'axios_call'       => $this->synthesizeFetchCall($node),
             'wp_store'         => $this->synthesizeWpStore($node),
             'file'             => $this->synthesizeFile($node, $edges),
+            'script'           => "Enqueued JavaScript asset (handle: {$node->label}).",
+            'style'            => "Enqueued CSS stylesheet (handle: {$node->label}).",
             'namespace'        => "PHP namespace group.",
             'dir'              => "JavaScript directory group.",
             default            => null,
@@ -451,14 +453,6 @@ class MetadataDescriptionSynthesizer
 
     private function synthesizeFile(Node $node, ?array $edges): string
     {
-        $subtype = $node->subtype;
-        if ($subtype === 'script') {
-            return 'Enqueued JavaScript asset.';
-        }
-        if ($subtype === 'style') {
-            return 'Enqueued CSS stylesheet.';
-        }
-
         // Determine language from the file extension
         $ext = strtolower(pathinfo($node->file ?? $node->label, PATHINFO_EXTENSION));
         $isJs = in_array($ext, ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs'], true);
