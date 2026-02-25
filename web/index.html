@@ -84,7 +84,7 @@
   <header class="bg-gray-800 border-b border-gray-700 flex flex-col shrink-0">
   <!-- Page title — visually hidden but announces the app to screen readers -->
   <h1 class="sr-only">Plugin Profiler</h1>
-  <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1">
+  <div class="flex items-center gap-x-2 px-3 py-1">
     <div class="flex items-center gap-2 mr-2 shrink-0">
       <span class="text-pink-400 font-bold text-sm">&#x25CE;</span>
       <div class="flex flex-col leading-tight min-w-0">
@@ -105,16 +105,13 @@
         list="node-labels"
         placeholder="Search nodes… (/)"
         aria-label="Search nodes"
-        class="bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-1 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        class="bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-1 text-sm w-40 min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-blue-400"
         autocomplete="off"
       />
       <datalist id="node-labels"></datalist>
     </div>
 
-    <div class="ml-auto flex flex-wrap items-center gap-2">
-      <!-- Stats -->
-      <span id="plugin-stats" class="text-gray-400 text-xs"></span>
-
+    <div class="ml-auto flex items-center gap-2 shrink-0">
       <!-- Layout -->
       <label for="layout-select" class="sr-only">Layout algorithm</label>
       <select
@@ -146,13 +143,13 @@
           class="view-mode-btn px-2 py-1 bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200 border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
           title="Structural edges: inheritance, composition, function calls, file includes — what the code requires to load"
           aria-pressed="false"
-        >Requirements</button>
+        >Requires</button>
         <button
           data-view="data"
           class="view-mode-btn px-2 py-1 bg-gray-700 text-orange-300 hover:bg-gray-600 hover:text-orange-200 border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
           title="Runtime edges: hooks, DB reads/writes, REST, AJAX, HTTP — what the plugin does at runtime"
           aria-pressed="false"
-        >Data flow</button>
+        >Data</button>
         <button
           data-view="web"
           class="view-mode-btn px-2 py-1 bg-gray-700 text-cyan-300 hover:bg-gray-600 hover:text-cyan-200 border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-inset"
@@ -181,6 +178,7 @@
       <button id="zoom-out" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" title="Zoom Out" aria-label="Zoom out">−</button>
       <button id="zoom-fit" class="text-gray-300 hover:text-white bg-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400" title="Fit (F)" aria-label="Fit graph (F)">Fit</button>
     </div>
+
   </div>
   <!-- Type filter buttons — second row, shown after graph loads -->
   <div id="type-filters" class="hidden flex-wrap gap-1 px-3 py-1 border-t border-gray-700 overflow-x-auto"></div>

@@ -717,7 +717,6 @@ async function main() {
   const totalEdges = (graphData.edges || []).length;
   document.getElementById('plugin-name').textContent    = p.name || 'Unknown Plugin';
   document.getElementById('plugin-version').textContent = p.version ? `v${p.version}` : '';
-  document.getElementById('plugin-stats').textContent   = `${totalNodes} nodes · ${totalEdges} edges`;
 
   // Show host path + re-analyze button
   const hostPath = p.host_path;
